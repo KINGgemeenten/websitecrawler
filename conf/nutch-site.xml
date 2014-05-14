@@ -1,0 +1,175 @@
+<?xml version="1.0"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+
+<!-- Put site-specific property overrides in this file. -->
+
+<configuration>
+  <!-- Enabled plugins -->
+  <property>
+    <name>plugin.includes</name>
+    <value>protocol-httpclient|parse-tika|index-(basic|more)|urlnormalizer-(basic|regex)|urlfilter-(prefix|suffix|domain|regex)|indexer-solr</value>
+  </property>
+
+
+  <property>
+    <name>db.ignore.internal.links</name>
+    <value>false</value>
+  </property>
+
+
+  <!-- HTTP library -->
+
+  <!-- Who are we -->
+  <property>
+    <name>http.agent.name</name>
+    <value>KINGSpider</value>
+  </property>
+  <property>
+    <name>http.agent.version</name>
+    <value>1.0</value>
+  </property>
+  <property>
+    <name>http.robots.agents</name>
+    <value>KINGSpider,*</value>
+  </property>
+  <property>
+    <name>http.agent.description</name>
+    <value>Apache Nutch 1.8 Webrichtlijnen Spider</value>
+  </property>
+  <property>
+    <name>http.agent.url</name>
+    <value>http://www.kinggemeenten.nl/</value>
+  </property>
+  <property>
+    <name>http.agent.email</name>
+    <value></value>
+  </property>
+  <!-- No more than 4MB HTML file allowed -->
+  <property>
+    <name>http.content.limit</name>
+    <value>4194304</value>
+  </property>
+  <!-- Time out after N seconds -->
+  <property>
+    <name>http.timeout</name>
+    <value>30000</value>
+  </property>
+  <!-- Never follow redirects within one cycle since there's no facility for deduplicating URL's -->
+  <property>
+    <name>http.redirect.max</name>
+    <value>0</value>
+  </property>
+
+  <!-- Generator settings -->
+
+  <!-- Aggregate records by host -->
+  <property>
+    <name>generate.count.mode</name>
+    <value>host</value>
+  </property>
+  <!-- Generate no more than N records per queue -->
+  <property>
+    <name>generate.max.count</name>
+    <value>64</value>
+  </property>
+
+  <!-- Queue by host -->
+  <property>
+   <name>fetcher.queue.mode</name>
+   <value>byHost</value>
+  </property>
+  <!-- No more than 1 thread per host -->
+  <property>
+    <name>fetcher.threads.per.queue</name>
+    <value>1</value>
+  </property>
+  <!-- Kill the queue after N exceptions such as transient connection errors -->
+  <property>
+    <name>fetcher.max.exceptions.per.queue</name>
+    <value>6</value>
+  </property>
+  <!-- No more than one request per host every N seconds -->
+  <property>
+    <name>fetcher.server.delay</name>
+    <value>5.0</value>
+  </property>
+  <!-- We don't need more than 20 threads -->
+  <property>
+    <name>fetcher.threads.fetch</name>
+    <value>20</value>
+  </property>
+  <!-- Kill a stalling fether after 10 minutes -->
+  <property>
+    <name>fetcher.timelimit.mins</name>
+    <value>30</value>
+  </property>
+  <!-- Start checking throughput just before time limit -->
+  <property>
+    <name>fetcher.throughput.threshold.check.after</name>
+    <value>20</value>
+  </property>
+  <!-- Minimum throughput of pages per second -->
+  <property>
+    <name>fetcher.throughput.threshold.pages</name>
+    <value>1</value>
+  </property>
+  <!-- Only a few retries allowed -->
+  <property>
+    <name>fetcher.throughput.threshold.retries</name>
+    <value>6</value>
+  </property>
+  <!-- Enable a parsing fetcher -->
+  <property>
+    <name>fetcher.parse</name>
+    <value>true</value>
+  </property>
+  <!-- We need the raw content stored -->
+  <property>
+    <name>fetcher.store.content</name>
+    <value>true</value>
+  </property>
+  <!-- Evident -->
+  <property>
+    <name>parser.html.outlinks.ignore_tags</name>
+    <value>img,script,link,form,frame</value>
+  </property>
+  <!-- We don't want to support parameters embedded in the URL's path segment -->
+  <property>
+    <name>parser.fix.embeddedparams</name>
+    <value>false</value>
+  </property>
+  <!-- Parser to time out after N seconds-->
+  <property>
+    <name>parser.timeout</name>
+    <value>10</value>
+  </property>
+
+  <!-- Do not limit the length of titles -->
+  <property>
+    <name>indexer.max.title.length</name>
+    <value>-1</value>
+  </property>
+  <!-- Write the domain as well -->
+  <property>
+    <name>indexer.add.domain</name>
+    <value>true</value>
+  </property>
+  <!-- Do not reindex unmodified documents by default -->
+  <property>
+    <name>indexer.skip.notmodified</name>
+    <value>true</value>
+  </property>
+  <!-- We don't want to break down MIME-types -->
+  <property>
+    <name>moreIndexingFilter.indexMimeTypeParts</name>
+    <value>false</value>
+  </property>
+
+  <!-- Solr settings -->
+
+  <!-- Where's Solr located? -->
+  <property>
+    <name>solr.server.url</name>
+    <value>http://vps38899.public.cloudvps.com:8080/solr/nutch</value>
+  </property>
+</configuration>
