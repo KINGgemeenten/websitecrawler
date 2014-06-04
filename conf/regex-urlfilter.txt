@@ -30,8 +30,13 @@
 #-^http://[^/]+?/.*(agenda|kalender|calendar|event)+.*(\d+[^\d]{1}){2}\d+
 # version using non-capturing group 
 #-^http://[^/]+?/.*(?:agenda|kalender|calendar|event)+.*(?:\d+[^\d]{1}){2}\d+
-# more more more!!!
--^http[s]://[^/]+?/.*(?:agenda|kalender|calendar|event|evenementen/(?:day|month|year))+.*(?:\d+[^\d]{1}){2}\d*
+# don't forget other protocol schemes
+#-^http[s]://[^/]+?/.*(?:agenda|kalender|calendar|event|evenementen/(?:day|month|year))+.*(?:\d+[^\d]{1}){2}\d*
+# this doesnt work http://www.westvoorne.nl/organisatie/bw-besluitenlijsten_43641/kalender/1917/3/
+# and this doesnt http://www.korendijk.nl/ontdek-korendijk/evenementenkalender_3591/kalender/2247/01/
+# AND THIS http://www.woudrichem.nl/inwoners/trouwen-in-woudrichem_41255/kalender/1927/09/9/
+-^http[s]*://[^/]+?/.*(?:agenda|kalender|calendar|event|evenementen/(?:day|month|year)*)+.*(?:\d+[^\d]{1}){2}\d*
+
 
 # Don't need this crap
 -download.html$
