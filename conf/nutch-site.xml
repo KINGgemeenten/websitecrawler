@@ -170,6 +170,6 @@
   <!-- Where's Solr located? -->
   <property>
     <name>solr.server.url</name>
-    <value>http://vps38899.public.cloudvps.com:8080/solr/nutch</value>
+    <value>http://vps38902.public.cloudvps.com:8080/solr/nutch</value>
   </property>
 </configuration>
