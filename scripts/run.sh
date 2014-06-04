@@ -4,6 +4,47 @@
   # Obtain an exclusive lock, give up if unable (non-block)
   if flock -x -n 200
   then
+    # Check for updated inject URL's and domain URL filter
+    echo Downloading updated seed.txt
+    if curl -s -f http://example.org/ > seed.txt.new
+    then
+      # Check it has changed
+      if ! diff -q inject_urls/seed.txt seed.txt.new
+      then
+        # Attempt to fetch the other file
+        echo Downloading domain-urlfilter.txt
+        if curl -s -f http://example.org/ > domain-urlfilter.txt.new
+        then
+          # Check domain URL filter has changed
+          if ! diff -q conf/domain-urlfilter.txt domain-urlfilter.txt.new
+          then
+            # And if all lines have at least one dot
+            if [ `grep "\n" domain-urlfilter.txt.new |  wc -l` -eq `grep . domain-urlfilter.txt.new |  wc -l` ]
+            then
+              # Copy stuff to their new home
+#              mv seed.txt.new inject_urls/seed.txt
+#              mv domain-urlfilter.txt.new conf/domain-urlfilter.txt
+
+              # Inject some
+echo              ./inject.sh
+            else
+              echo Domain-urlfilter.txt does not conform to specs
+            fi
+          else
+            echo Domain-urlfilter.txt has not changed
+          fi
+        else
+          echo Could not download domain-urlfilter.txt
+        fi
+      else
+        echo Seed.txt has not changed
+      fi
+      echo Could not download seed.txt
+    fi
+
+    # Remove temp crap if it's still there
+    rm -f seed.txt.new domain-urlfilter.txt.new
+
     # Check if there are URL's for one time free generation
     if [ "$(ls -A free_urls/)" ]
     then
