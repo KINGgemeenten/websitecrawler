@@ -7,10 +7,10 @@
   <!-- Enabled plugins -->
   <property>
     <name>plugin.includes</name>
-    <value>protocol-httpclient|parse-tika|index-(basic|more)|urlnormalizer-(basic|regex)|urlfilter-(prefix|suffix|domain|regex)|indexer-solr</value>
+    <value>protocol-httpclient|parse-tika|index-(basic|more)|urlnormalizer-(basic|regex)|urlfilter-(prefix|suffix|domain|regex)|indexer-solr|badencoding-detector</value>
   </property>
 
-
+  <!-- we don't use this for now -->
   <property>
     <name>db.ignore.internal.links</name>
     <value>false</value>
