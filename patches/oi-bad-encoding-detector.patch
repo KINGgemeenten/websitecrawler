@@ -1,0 +1,2154 @@
+Index: src/plugin/build.xml
+===================================================================
+--- src/plugin/build.xml	(revision 1600637)
++++ src/plugin/build.xml	(working copy)
+@@ -26,6 +26,7 @@
+   <!-- Build & deploy all the plugin jars.                    -->
+   <!-- ====================================================== -->
+   <target name="deploy">
++     <ant dir="badencoding-detector" target="deploy"/>
+      <ant dir="creativecommons" target="deploy"/>
+      <ant dir="feed" target="deploy"/>
+      <ant dir="headings" target="deploy"/>
+@@ -80,6 +81,7 @@
+   <!-- ====================================================== -->
+   <target name="test">
+     <parallel threadCount="2">
++     <ant dir="badencoding-detector" target="test"/>
+      <ant dir="creativecommons" target="test"/>
+      <ant dir="index-basic" target="test"/>
+      <ant dir="index-anchor" target="test"/>
+@@ -116,6 +118,7 @@
+   <!-- Clean all of the plugins.                              -->
+   <!-- ====================================================== -->
+   <target name="clean">
++    <ant dir="badencoding-detector" target="clean"/>
+     <ant dir="creativecommons" target="clean"/>
+     <ant dir="feed" target="clean"/>
+     <ant dir="headings" target="clean"/>
+Index: src/plugin/badencoding-detector/ivy.xml
+===================================================================
+--- src/plugin/badencoding-detector/ivy.xml	(revision 0)
++++ src/plugin/badencoding-detector/ivy.xml	(revision 0)
+@@ -0,0 +1,40 @@
++<?xml version="1.0" ?>
++
++<!--
++   Licensed to the Apache Software Foundation (ASF) under one or more
++   contributor license agreements.  See the NOTICE file distributed with
++   this work for additional information regarding copyright ownership.
++   The ASF licenses this file to You under the Apache License, Version 2.0
++   (the "License"); you may not use this file except in compliance with
++   the License.  You may obtain a copy of the License at
++
++       http://www.apache.org/licenses/LICENSE-2.0
++
++   Unless required by applicable law or agreed to in writing, software
++   distributed under the License is distributed on an "AS IS" BASIS,
++   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++   See the License for the specific language governing permissions and
++   limitations under the License.
++-->
++
++<ivy-module version="1.0">
++  <info organisation="io.openindex.nutch" module="${ant.project.name}">
++    <license name="Apache 2.0"/>
++    <ivyauthor name="Openindex" url="https://www.openindex.io/"/>
++    <description>
++        Apache Nutch
++    </description>
++  </info>
++
++  <configurations>
++      <include file="${nutch.root}/ivy/ivy-configurations.xml"/>
++  </configurations>
++
++  <publications>
++    <artifact conf="master"/>
++  </publications>
++
++  <dependencies>
++  </dependencies>
++  
++</ivy-module>
+Index: src/plugin/badencoding-detector/src/test/io/openindex/nutch/parse/badencoding/TestBadEncodingParseFilter.java
+===================================================================
+--- src/plugin/badencoding-detector/src/test/io/openindex/nutch/parse/badencoding/TestBadEncodingParseFilter.java	(revision 0)
++++ src/plugin/badencoding-detector/src/test/io/openindex/nutch/parse/badencoding/TestBadEncodingParseFilter.java	(revision 0)
+@@ -0,0 +1,111 @@
++/**
++ * Licensed to the Apache Software Foundation (ASF) under one or more
++ * contributor license agreements.  See the NOTICE file distributed with
++ * this work for additional information regarding copyright ownership.
++ * The ASF licenses this file to You under the Apache License, Version 2.0
++ * (the "License"); you may not use this file except in compliance with
++ * the License.  You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++package io.openindex.nutch.parse.badencoding;
++
++import java.io.BufferedReader;
++import java.io.IOException;
++import java.io.Reader;
++import java.util.Iterator;
++import java.util.Map;
++
++import org.apache.nutch.metadata.Metadata;
++import org.apache.nutch.parse.Parse;
++import org.apache.nutch.parse.ParseData;
++import org.apache.nutch.parse.ParseResult;
++import org.apache.nutch.parse.ParseUtil;
++import org.apache.nutch.protocol.Content;
++import org.apache.hadoop.conf.Configuration;
++import org.apache.nutch.util.NutchConfiguration;
++import java.util.Map.Entry;
++import junit.framework.TestCase;
++
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
++import org.w3c.dom.DocumentFragment;
++
++import org.apache.nutch.protocol.ProtocolFactory;
++import org.apache.nutch.protocol.Protocol;
++import org.apache.nutch.protocol.Content;
++import org.apache.nutch.protocol.ProtocolException;
++import org.apache.nutch.crawl.CrawlDatum;
++import org.apache.nutch.util.MimeUtil;
++import org.apache.hadoop.io.Text;
++
++import org.apache.hadoop.util.StringUtils;
++
++/**
++ * Tests for the BadEncodingParseFilter
++ *
++ * @author markus@openindex.io
++ */
++public class TestBadEncodingParseFilter extends TestCase {
++  private final static Logger LOG = LoggerFactory.getLogger(TestBadEncodingParseFilter.class);
++  private final static String SEPARATOR = System.getProperty("file.separator");
++  private final static String SAMPLES = System.getProperty("test.models", ".");
++  
++  private Configuration conf;
++
++  private BadEncodingParseFilter filter = new BadEncodingParseFilter();
++
++  public TestBadEncodingParseFilter() {
++    conf = NutchConfiguration.create();
++    conf.set("plugin.includes", "parse-tika");
++    filter.setConf(conf);
++  }
++  
++  public void testBadURLs() throws Exception {
++    assertTrue(getPage("bad-urls.html"));
++    assertFalse(getPage("no-bad-urls.html"));
++  }
++  
++  private boolean getPage(String uri) throws Exception {
++    String url = "http://example.org/" + uri;
++    Reader reader = conf.getConfResourceAsReader("badencoding-detector/test/test-documents/" + uri);
++    StringBuilder html = new StringBuilder();
++    
++    int numBadUrls = 0;
++    
++    System.out.println("FILE:: " + url);
++
++    try {
++      BufferedReader bufferedReader = new BufferedReader(reader);
++      String line = null;
++      while ((line = bufferedReader.readLine()) != null) {
++        html.append(line);
++      }
++    } catch ( IOException e) {
++      System.out.println("BufferedReader error: ");
++      e.printStackTrace();
++      return false;
++    }
++    
++    Content content = new Content(url, url, html.toString().getBytes(), "text/html", new Metadata(), conf);
++    
++    try{
++      ParseResult parseResult = new ParseUtil(conf).parse(content);
++      ParseData parseData = parseResult.get(url).getData();
++      
++      numBadUrls = filter.findBadURLs(parseData.getOutlinks());
++    } catch (Exception e) {
++      LOG.error("Error parsing: "); System.out.println(StringUtils.stringifyException(e));
++    }
++
++    System.out.println(numBadUrls + "\t" + uri + "\n");
++
++    return numBadUrls > 0 ? true : false;
++  }
++}    
+\ No newline at end of file
+Index: src/plugin/badencoding-detector/src/java/io/openindex/nutch/parse/badencoding/BadEncodingParseFilter.java
+===================================================================
+--- src/plugin/badencoding-detector/src/java/io/openindex/nutch/parse/badencoding/BadEncodingParseFilter.java	(revision 0)
++++ src/plugin/badencoding-detector/src/java/io/openindex/nutch/parse/badencoding/BadEncodingParseFilter.java	(revision 0)
+@@ -0,0 +1,166 @@
++
++/**
++ * Licensed to the Apache Software Foundation (ASF) under one or more
++ * contributor license agreements.  See the NOTICE file distributed with
++ * this work for additional information regarding copyright ownership.
++ * The ASF licenses this file to You under the Apache License, Version 2.0
++ * (the "License"); you may not use this file except in compliance with
++ * the License.  You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++package io.openindex.nutch.parse.badencoding;
++
++import org.apache.hadoop.io.Text;
++import org.apache.nutch.metadata.Metadata;
++import org.apache.nutch.parse.HTMLMetaTags;
++import org.apache.nutch.parse.HtmlParseFilter;
++import org.apache.nutch.parse.Outlink;
++import org.apache.nutch.parse.Parse;
++import org.apache.nutch.parse.ParseResult;
++import org.apache.nutch.parse.ParseUtil;
++import org.apache.nutch.protocol.Content;
++import org.apache.nutch.util.URLUtil;
++import org.apache.nutch.parse.ParseUtil;
++import org.apache.nutch.util.NutchConfiguration;
++
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
++import org.w3c.dom.DocumentFragment;
++
++import org.apache.hadoop.conf.Configuration;
++
++/**
++ * Bad URL Encoding Detector parse filter. Parser filter impl. to detect bad encoded URL's and
++ * mark this page as having bad URL's.
++ * 
++ * @author markus@openindex.io
++ */
++public class BadEncodingParseFilter implements HtmlParseFilter {
++  public static final Logger LOG = LoggerFactory.getLogger(BadEncodingParseFilter.class);
++  private Configuration conf;
++  
++  /**
++   * Whether to mark pages containing bad URL's with a value of TRUE or
++   * using the amount of bad URL's in the page.
++   */
++  private boolean markAsAmount = false;
++  
++  /**
++   * Whether to write a value also if no bad URL's are found.
++   */
++  private boolean alsoWriteIfNoneFound = false;
++  
++  /**
++   * The field name to write to.
++   */
++  private String field = "badencoding";
++  
++  /**
++   * Default constructor
++   */
++  public BadEncodingParseFilter() {
++    conf = NutchConfiguration.create();
++  }
++
++  /**
++   * Bad encoding parse filter
++   *
++   * @param Content
++   * @param ParseResult
++   * @param HTMLMetaTags
++   * @param DocumentFragment
++   * @return ParseResult
++   */
++  public ParseResult filter(Content content, ParseResult parseResult,
++    HTMLMetaTags metaTags, DocumentFragment doc) {
++    
++    // Get the url
++    String url = content.getUrl();
++    
++    // Parse object voor deze URL
++    Parse parse = parseResult.get(url);
++    
++    // Only handle HTML pages
++    if (!(content.getContentType().equals("application/xhtml+xml") || content.getContentType().equals("text/html"))) {
++      return parseResult;
++    }
++    
++    // Detect the stuff!
++    int numBadURLs = findBadURLs(parse.getData().getOutlinks());
++
++    // Write stuff?
++    if (numBadURLs > 0 || alsoWriteIfNoneFound) {
++      // Make a value!
++      String value = markAsAmount ? Integer.toString(numBadURLs) : (numBadURLs > 0 ? "true" : "false");
++      
++      // !
++      parse.getData().getParseMeta().set(field, value);
++    }
++    
++    // Ok!
++    return parseResult;
++  }
++  
++  /**
++   * Check the specific outlinks for inproper encoding.
++   *
++   * @param outlinks the outlinks to check
++   * @return int
++   */
++  public int findBadURLs(Outlink[] outlinks) {
++    // Out counter
++    int numBadURLs = 0;
++    
++    System.out.println(outlinks);
++    
++    for (int i = 0; i < outlinks.length; i++) {
++      // Get the target
++      String target = outlinks[i].getToUrl();
++      
++      System.out.println(target);
++      
++      // Check for spaces
++      if (target.indexOf(" ") != -1) {
++        numBadURLs++;
++        continue;
++      }
++      
++      // Check for non- 7-bit ASCII chars
++      for (int j = 0; j < target.length(); j++) {
++        // Got one?
++        if (target.charAt(j) > 127) {
++          numBadURLs++;
++          continue;
++        }
++      }      
++    }
++    
++    // Euy!
++    return numBadURLs;
++  }
++  
++  /**
++   * @param Configuration
++   */
++  public void setConf(Configuration conf) {
++    this.conf = conf;
++
++    markAsAmount = conf.getBoolean("badencoding.mark.amount", false);
++    alsoWriteIfNoneFound = conf.getBoolean("badencoding.write.always", false);
++    field = conf.get("badencoding.field", "badencoding");
++  }
++
++  /**
++   * @return Configuration
++   */
++  public Configuration getConf() {
++    return this.conf;
++  }
++}
+Index: src/plugin/badencoding-detector/plugin.xml
+===================================================================
+--- src/plugin/badencoding-detector/plugin.xml	(revision 0)
++++ src/plugin/badencoding-detector/plugin.xml	(revision 0)
+@@ -0,0 +1,44 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<!--
++ Licensed to the Apache Software Foundation (ASF) under one or more
++ contributor license agreements.  See the NOTICE file distributed with
++ this work for additional information regarding copyright ownership.
++ The ASF licenses this file to You under the Apache License, Version 2.0
++ (the "License"); you may not use this file except in compliance with
++ the License.  You may obtain a copy of the License at
++
++     http://www.apache.org/licenses/LICENSE-2.0
++
++ Unless required by applicable law or agreed to in writing, software
++ distributed under the License is distributed on an "AS IS" BASIS,
++ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ See the License for the specific language governing permissions and
++ limitations under the License.
++-->
++<plugin
++   id="badencoding-detector"
++   name="Bad URL encoding detector"
++   version="1.0.0"
++   provider-name="openindex.io">
++
++   <runtime>
++      <library name="badencoding-detector.jar">
++         <export name="*"/>
++      </library>
++   </runtime>
++
++   <requires>
++      <import plugin="nutch-extensionpoints"/>
++   </requires>
++
++   <extension id="io.openindex.nutch.parse.badencoding"
++              name="Nutch Bad URL Encoding detector Parse Filter"
++              point="org.apache.nutch.parse.HtmlParseFilter">
++
++      <implementation id="HeadingsParseFilter"
++                      class="io.openindex.nutch.parse.badencoding.BadEncodingParseFilter">
++      </implementation>
++
++   </extension>
++
++</plugin>
+Index: src/plugin/badencoding-detector/test-documents/no-bad-urls.html
+===================================================================
+--- src/plugin/badencoding-detector/test-documents/no-bad-urls.html	(revision 0)
++++ src/plugin/badencoding-detector/test-documents/no-bad-urls.html	(revision 0)
+@@ -0,0 +1,177 @@
++<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
++"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
++
++<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="nl" lang="nl">
++<head>
++	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
++
++	<title>Archief Gemeenteraad in 2014
++</title>
++	<meta name="author" content="GemeenteOplossingen - http://www.gemeenteoplossingen.nl" />
++	<meta name="generator" content="io4 cms versie 3.2" />
++	<link rel="stylesheet" type="text/css" href="/site/tynaarlo44/css/default.css" media="screen"></link>
++	<link rel="stylesheet" type="text/css" href="/site/tynaarlo44/css/meeting.css" media="screen"></link>
++	<link rel="stylesheet" type="text/css" href="/site/tynaarlo44/css/print.css" media="print" />
++	
++	
++	<link rel="home" title="Home" href="/" />
++	<link rel="contents" title="Sitemap" href="/sitemap" />
++	<link rel="search" title="Zoeken" href="/zoeken" />
++	
++    <script type="text/javascript" src="/site/tynaarlo44/script/jquery.js"></script>
++    <script type="text/javascript">
++        jQuery.noConflict();
++        $j = jQuery;
++    </script>
++	<script type="text/javascript" src="/site/tynaarlo44/script/politeIeWarn.min.js"></script>
++	<script type="text/javascript" src="/site/tynaarlo44/script/prototype.js"></script>
++	<script type="text/javascript" src="/site/tynaarlo44/script/activeplx.js"></script>
++	<script type="text/javascript" src="/site/tynaarlo44/script/vergadering.js"></script>
++	<script type="text/javascript" src="/site/tynaarlo44/script/gui.js"></script>
++	
++	<!--[if IE]>
++		<script defer type="text/javascript" src="/site/tynaarlo44/script/ie_onload.js"></script>
++		<link rel="stylesheet" type="text/css" href="/site/tynaarlo44/css/ie.css" media="screen" />
++	<![endif]-->
++	
++	<!--[if IE 6]>
++		<link rel="stylesheet" type="text/css" href="/site/tynaarlo44/css/ie6.css" media="screen" />
++	<![endif]-->
++
++	<!--
++		Technische realisatie:	
++		
++		GemeenteOplossingen
++		http://www.gemeenteoplossingen.nl
++	-->
++	
++</head>
++
++<body id="top">
++	<div id="main_container">
++	<!--<h1 class="hidden">Archief Gemeenteraad in 2014
++</h1>-->
++	<a class="skip" href="#header">Over deze site overslaan</a>
++	
++			<div id="content">
++			<div id="klikpad">U bent hier: <a href="/Vergaderingen/" >Vergaderingen</a> <span class="divider">&raquo;</span> <strong>Gemeenteraad</strong></div>
++				<h2 class="alignleft"><span class="highlighted">Archief vergaderingen</span> Gemeenteraad</h2>
++<p>Hieronder staat een overzicht van de  vergaderingen van de Gemeenteraad.</p>
++
++<ul id="vergaderingen">
++<li><a href="/Vergaderingen/Gemeenteraad/2014/13-mei/20:00">13 mei 20:00</a></li>
++<li><a href="/Vergaderingen/Gemeenteraad/2014/22-april/19:30">22 april 19:30</a></li>
++<li><a href="/Vergaderingen/Gemeenteraad/2014/27-maart/20:00">27 maart 20:00</a></li>
++<li><a href="/Vergaderingen/Gemeenteraad/2014/25-maart/20:00">25 maart 20:00</a></li>
++<li><a href="/Vergaderingen/Gemeenteraad/2014/4-maart/20:00">4 maart 20:00</a></li>
++<li><a href="/Vergaderingen/Gemeenteraad/2014/18-februari/20:00">18 februari 20:00</a></li>
++<li><a href="/Vergaderingen/Gemeenteraad/2014/11-februari/19:30">11 februari 19:30</a></li>
++<li><a href="/Vergaderingen/Gemeenteraad/2014/4-februari/20:00">4 februari 20:00</a></li>
++<li><a href="/Vergaderingen/Gemeenteraad/2014/21-januari/20:00">21 januari 20:00</a></li>
++<li><a href="/Vergaderingen/Gemeenteraad/2014/7-januari/20:00">7 januari 20:00</a></li>
++</ul>
++
++				<div id="jaren">
++					<ul>
++						<li class="current_year"><a href="/Vergaderingen/Gemeenteraad/2014">2014</a></li>
++<li ><a href="/Vergaderingen/Gemeenteraad/2013">2013</a></li>
++<li ><a href="/Vergaderingen/Gemeenteraad/2012">2012</a></li>
++<li ><a href="/Vergaderingen/Gemeenteraad/2011">2011</a></li>
++<li ><a href="/Vergaderingen/Gemeenteraad/2010">2010</a></li>
++<li ><a href="/Vergaderingen/Gemeenteraad/2009">2009</a></li>
++<li ><a href="/Vergaderingen/Gemeenteraad/2008">2008</a></li>
++<li ><a href="/Vergaderingen/Gemeenteraad/2007">2007</a></li>
++<li ><a href="/Vergaderingen/Gemeenteraad/2006">2006</a></li>
++
++					</ul>	
++				</div>
++				
++				
++			</div>
++					
++		<div id="header">
++			<div id="logo"><a href="/" title="Terug naar home">&nbsp;</a></div>
++			<h2 class="nonvisual">Site Navigatie</h2>
++			<h3 class="nonvisual">Hoofdmenu</h3>
++<ul id="menu">
++<li><a href="/"><span>welkom</span></a></li>
++<li><a href="/Organisatie"><span>organisatie</span></a></li>
++<li><a class="active" href="/Vergaderingen"><span>vergaderingen</span></a></li>
++<li><a href="/Nieuws"><span>nieuws</span></a></li>
++<li><a href="/Themas"><span>thema's</span></a></li>
++<li><a href="/Abonnement"><span>abonnement</span></a></li>
++</ul>	
++			
++			<div id="action_menu">
++				<h3 class="nonvisual">Pagina opties</h3>
++<ul>
++	<!--li><a class="rss" href="/rss_vergaderingen">rss</a></li-->
++	<li><a class="print" href="/Vergaderingen/Gemeenteraad/print">Afdrukken</a></li>
++	<!--li><a class="readspeak" href="/">Lees voor</a></li-->
++	<li>
++		<a class="text_sml" href="/zoom/level1">a</a>
++		<a class="text_mid" href="/zoom/level2">a</a>
++		<a class="text_lrg" href="/zoom/level3">a</a>
++	</li>
++</ul>
++			</div>					
++					
++			
++			<div id="header_navigation">
++				
++				<h3 class="nonvisual">Over deze site</h3>
++<ul>
++	<li><a class="contact" href="/Over-deze-site/Contact/">Contact</a></li>
++	<li><a class="proclaimer" href="/Over-deze-site/Proclaimer/">Proclaimer</a></li>
++	<li><a class="colofon" href="/Over-deze-site/Colofon/">Colofon</a></li>	
++	<li><a class="home" href="/"><span>welkom</span></a></li>
++</ul>	
++			</div>
++
++			<div id="inloggen">
++				
++				<h3 class="nonvisual">Inloggen</h3>
++<p class="nonvisual">U kunt inloggen als raadslid: </p><a id="inloggen_link" href="/inloggen?url=/Vergaderingen/Gemeenteraad/">Inloggen</a>
++
++			</div>
++			
++			<div id="search">
++				<!-- Zoeken -->
++	<h3 class="nonvisual" id="zoeken">Zoeken</h3>
++	<form action="/zoek/" method="post">
++		<fieldset>
++			<legend>Snelzoeken</legend>
++			<input type="text" id="q" name="zoek_opdracht" value="Uw zoekopdracht" />
++			<input type="submit" id="search_button" name="vind" value="" />
++			<input type="hidden" value="alle_woorden" class="hidden" name="search" />
++			<a href="/zoeken/">Geavanceerd zoeken</a>
++		</fieldset>
++	</form>
++			</div>		
++			
++		</div>	
++		
++			</div> <!--EOF container -->
++	<!-- Footer -->
++			<h2 class="hidden">Contact gegevens</h2>
++			
++			<div id="footer">
++				<div id="footerinner">
++	
++	<div id="footerright">
++		<h3> Snel naar </h3>
++		<ul>
++			<li><a href="/">Home </a></li>
++			<li><a href="/sitemap">Sitemap </a></li>
++			<li><a href="/zoeken">Zoeken </a></li>
++		</ul>
++
++	</div>
++	
++	<a href="#top" title="terug naar boven" id="back"><span>Terug naar boven</span></a>
++</div>
++
++			</div>	<!--EOF footer-->	
++	
++</body>
++</html><!-- t:0.121648 -->
+\ No newline at end of file
+Index: src/plugin/badencoding-detector/test-documents/bad-urls.html
+===================================================================
+--- src/plugin/badencoding-detector/test-documents/bad-urls.html	(revision 0)
++++ src/plugin/badencoding-detector/test-documents/bad-urls.html	(revision 0)
+@@ -0,0 +1,1523 @@
++<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
++"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
++
++<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="nl" lang="nl">
++<head>
++	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
++
++	<title>Gemeenteraad 14 oktober 2008 20:00
++</title>
++	<meta name="author" content="GemeenteOplossingen - http://www.gemeenteoplossingen.nl" />
++	<meta name="generator" content="io4 cms versie 3.2" />
++	<link rel="stylesheet" type="text/css" href="/site/tynaarlo44/css/default.css" media="screen"></link>
++	<link rel="stylesheet" type="text/css" href="/site/tynaarlo44/css/meeting.css" media="screen"></link>
++	<link rel="stylesheet" type="text/css" href="/site/tynaarlo44/css/print.css" media="print" />
++	<link rel="stylesheet" type="text/css" href="/site/tynaarlo44/css/flash.css" media="print" />
++	
++	
++	<link rel="home" title="Home" href="/" />
++	<link rel="contents" title="Sitemap" href="/sitemap" />
++	<link rel="search" title="Zoeken" href="/zoeken" />
++	
++	<script type="text/javascript" src="/site/tynaarlo44/script/jquery.js"></script>
++	<script type="text/javascript">
++		jQuery.noConflict();
++		$j = jQuery;
++	</script>
++	<script type="text/javascript" src="/site/tynaarlo44/script/politeIeWarn.min.js"></script>
++	<script type="text/javascript" src="/site/tynaarlo44/script/gui.js"></script>
++	
++	
++	<script type="text/javascript" src="/site/tynaarlo44/script/prototype.js"></script>
++	<script type="text/javascript" src="/site/tynaarlo44/script/activeplx.js"></script>
++	
++	
++	<script type="text/javascript" src="/site/tynaarlo44/script/AdobeFlashDetection.js"></script>
++	<script type="text/javascript" src="/site/tynaarlo44/script/vergadering.js"></script>
++	
++	<!--[if IE]>
++		<script defer type="text/javascript" src="/site/tynaarlo44/script/ie_onload.js"></script>
++		<link rel="stylesheet" type="text/css" href="/site/tynaarlo44/css/ie.css" media="screen" />
++	<![endif]-->
++	
++	<!--[if IE 6]>
++		<link rel="stylesheet" type="text/css" href="/site/tynaarlo44/css/ie6.css" media="screen" />
++		<link rel="stylesheet" type="text/css" href="/site/tynaarlo44/css/ie6_meeting.css" media="screen" />
++	<![endif]-->
++
++	<!--
++		Technische realisatie:	
++		
++		GemeenteOplossingen
++		http://www.gemeenteoplossingen.nl
++	-->
++	
++</head>
++
++<body id="top">
++	<div id="main_container">
++	<!--<h1 class="hidden">Gemeenteraad 14 oktober 2008 20:00
++</h1>-->
++	<a class="skip" href="#header">Over deze site overslaan</a>
++	
++			<div id="content">
++			<div id="klikpad">U bent hier: <a href="/Vergaderingen/" >Vergaderingen</a> <span class="divider">&raquo;</span> <a href="/Vergaderingen/Gemeenteraad/" >Gemeenteraad</a> <span class="divider">&raquo;</span> <a href="/Vergaderingen/Gemeenteraad/2008/" >2008</a> <span class="divider">&raquo;</span> <a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/" >14-oktober</a> <span class="divider">&raquo;</span> <strong>20:00</strong></div>
++
++				
++				
++				<h1 id="title"><span class="highlighted">Gemeenteraad</span> 14 oktober 2008 20:00 uur </h1><div id="title_note_icon"></div>
++				<div class="warning" id="flashversion">
++	<p>  
++		Bij het zien van deze tekst is het mogelijk dat <br/>
++		u niet beschikt over de juiste Flash player.
++		<br/><br/>
++		Klik op onderstaande afbeelding en installeer de nieuwste versie.
++		<br/><br/>
++		<a href="http://get.adobe.com/flashplayer/">
++			<img src="http://www.adobe.com/images/shared/download_buttons/get_flash_player.gif" alt="Get Adobe Flash player" />
++		</a>
++	</p>
++</div>
++
++				
++				<div id="print_links">
++				<a class="print_pagina" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/print">Print deze agenda</a>
++				
++				
++                <a class="print_pagina download_documenten" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/alle-documenten">Download alle documenten</a>
++
++				</div>
++				<div id="live_film">
++					
++					
++					
++					
++					
++					
++					<div id="alternate_live_streams">					
++						
++						
++						
++						
++						
++						
++					</div>
++				</div>
++				
++				<div id="agendapunten">
++					<h2 class="nonvisual">Agendapunten</h2>
++<ul id="vergadering" class="hilite">
++<!--<thead>
++	<tr>
++		<th scope="col">Agendapunt</th>
++		<th scope="col" colspan="2">Titel</th>
++		<th scope="col">Extra</th>
++	</tr>
++</thead>
++<tbody>
++--><li id="agendapunt842_154" class="actief agendaRow">
++	<div class="first">
++		<a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Opening">1</a>
++	</div>
++	<div class="title">
++		<h3><a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Opening"> Opening</a></h3>
++		<em>Bespreekstuk</em>
++		
++	</div>
++	<div class="last">
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Opening/notitie/" title="Notitie" class="note_hide" id="notelink842_2_"></a>
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Opening"><span id="button842" class="play">&nbsp;</span></a>
++		
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Opening"><span class="bijlage_false">&nbsp;</span></a>		
++	</div>
++	<div class="clearer"></div>
++
++	<div id="attachements_842" class="attachementRow attachement">
++		<div class="filmcontent">
++			<div id="film_842" class="film">
++				<input type="hidden" id="fragment_id" value="842" />
++
++<object id="MediaPlayer" classid="clsid:22D6F312-B0F6-11D0-94AB-0080C74C7E95" type="application/x-oleobject" codebase="http://activex.microsoft.com/activex/controls/mplayer/en/nsmp2inf.cab#Version=6,0,02,902" width="300" height="290">
++    <param name="wmode" value="transparent" />
++    <param name="filename" value="http://raad.tynaarlo.nl/modules/risbis/risbis.php?g=make_playlist&amp;fragment_object_id=154" />
++	<param name="autostart" value="true" />
++	<param name="showcontrols" value="true" />
++	<param name="ShowStatusBar" value="true" />
++	<!--[if !IE]> <-->
++	<object id="MediaPlayer2" type="application/x-mplayer2" width="320" height="320">
++        <param name="wmode" value="transparent" />
++		<param name="url" value="http://raad.tynaarlo.nl/modules/risbis/risbis.php?g=make_playlist&amp;fragment_object_id=154" />
++		<param name="filename" value="http://raad.tynaarlo.nl/modules/risbis/risbis.php?g=make_playlist&amp;fragment_object_id=154" />
++		<param name="autostart" value="true" />
++		<param name="showcontrols" value="true" />
++		<param name="ShowStatusBar" value="true" />
++	</object>
++	<!--> <![endif]-->
++</object>
++
++ 
++				 
++				
++			</div>
++			<div id="fragmenten_842" class="fragments"></div>
++		</div>
++	
++	
++		<div id="persons_842" class="persons">
++			<div id="sprekers_842" class="speakers">	<h3>Sprekers:</h3>
++	<ul>
++		<li id="sf_2060"><a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Opening/Spreker/20:09:58/" title="Spreker" onclick="javascript:set_speaker(this, 39138);return false;" id="speaker_8_154_2060">Spreker<span class="fractie"></span></a><em>00:37</em></li>
++		<li id="sf_2061"><a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Opening/F.A.van-Zuilen/20:10:35/" title="F.A.van Zuilen" onclick="javascript:set_speaker(this, 39175);return false;" id="speaker_8_154_2061">F.A.van Zuilen<span class="fractie">Voorzitter</span></a><em>00:02</em></li>
++		<li id="sf_2062"><a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Opening/C.H.vd-Berg-Huisman/20:10:37/" title="C.H. van den Berg" onclick="javascript:set_speaker(this, 39177);return false;" id="speaker_8_154_2062">C.H. van den Berg<span class="fractie">D66</span></a><em>00:25</em></li>
++		<li id="sf_2063"><a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Opening/Spreker/20:11:02/" title="Spreker" onclick="javascript:set_speaker(this, 39202);return false;" id="speaker_8_154_2063">Spreker<span class="fractie"></span></a><em>00:26</em></li>
++		<li id="sf_2064"><a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Opening/F.A.van-Zuilen/20:11:28/" title="F.A.van Zuilen" onclick="javascript:set_speaker(this, 39228);return false;" id="speaker_8_154_2064">F.A.van Zuilen<span class="fractie">Voorzitter</span></a><em>00:07</em></li>
++		<li id="sf_2065"><a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Opening/C.H.Kloos/20:11:35/" title="C.H.  Kloos" onclick="javascript:set_speaker(this, 39235);return false;" id="speaker_8_154_2065">C.H.  Kloos<span class="fractie">Leefbaar Tynaarlo</span></a><em>00:08</em></li>
++		<li id="sf_2067"><a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Opening/F.A.van-Zuilen/20:11:46/" title="F.A.van Zuilen" onclick="javascript:set_speaker(this, 39246);return false;" id="speaker_8_154_2067">F.A.van Zuilen<span class="fractie">Voorzitter</span></a><em>00:06</em></li>
++		<li id="sf_2068"><a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Opening/C.H.vd-Berg-Huisman/20:11:52/" title="C.H. van den Berg" onclick="javascript:set_speaker(this, 39252);return false;" id="speaker_8_154_2068">C.H. van den Berg<span class="fractie">D66</span></a><em>00:10</em></li>
++		<li id="sf_2069"><a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Opening/F.A.van-Zuilen/20:12:02/" title="F.A.van Zuilen" onclick="javascript:set_speaker(this, 39262);return false;" id="speaker_8_154_2069">F.A.van Zuilen<span class="fractie">Voorzitter</span></a><em>01:06</em></li>
++	</ul>
++</div>
++		</div>
++	
++		<div id="aanhetwoord_842" class="speaking"></div>
++		<div class="info">
++			<div id="meerinformatie_842" class="more">	<h4>Meer informatie:</h4>
++	<ul>
++		
++		
++		<li class="status">Bespreekstuk</li>
++		
++		
++		
++	</ul>
++	</div>
++			<div id="agendapunt_documenten_842" class="documents"></div>
++		</div>
++		<div class="clearer"></div>
++			
++	</div><!--eof attachementRow-->
++
++<div id="note842_2" class="note_hide">
++	<span>
++		&nbsp;
++	</span>
++</div>
++</li><!-- eof agendaRow--><li id="agendapunt843_155" class=" agendaRow">
++	<div class="first">
++		<a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Vaststellen-van-de-agenda">2</a>
++	</div>
++	<div class="title">
++		<h3><a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Vaststellen-van-de-agenda"> Vaststellen van de agenda</a></h3>
++		<em>Bespreekstuk</em>
++		
++	</div>
++	<div class="last">
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Vaststellen-van-de-agenda/notitie/" title="Notitie" class="note_hide" id="notelink843_2_"></a>
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Vaststellen-van-de-agenda"><span id="button843" class="play">&nbsp;</span></a>
++		
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Vaststellen-van-de-agenda"><span class="bijlage_true">&nbsp;</span></a>		
++	</div>
++	<div class="clearer"></div>
++
++	<div id="attachements_843" class="attachementRow attachement hide">
++		<div class="filmcontent">
++			<div id="film_843" class="film">
++				 
++				 
++				
++			</div>
++			<div id="fragmenten_843" class="fragments"></div>
++		</div>
++	
++	
++		<div id="persons_843" class="persons">
++			<div id="sprekers_843" class="speakers"></div>
++		</div>
++	
++		<div id="aanhetwoord_843" class="speaking"></div>
++		<div class="info">
++			<div id="meerinformatie_843" class="more">	<h4>Meer informatie:</h4>
++	<ul>
++		
++		
++		<li class="status">Bespreekstuk</li>
++		
++		
++		
++	</ul>
++	</div>
++			<div id="agendapunt_documenten_843" class="documents"></div>
++		</div>
++		<div class="clearer"></div>
++			
++	</div><!--eof attachementRow-->
++
++<div id="note843_2" class="note_hide">
++	<span>
++		&nbsp;
++	</span>
++</div>
++</li><!-- eof agendaRow--><li id="agendapunt844_156" class=" agendaRow">
++	<div class="first">
++		<a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Vaststellen-van-het-verslag-van-de-vorige-raadsvergadering--actielijst-">3</a>
++	</div>
++	<div class="title">
++		<h3><a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Vaststellen-van-het-verslag-van-de-vorige-raadsvergadering--actielijst-"> Vaststellen van het verslag van de vorige raadsvergadering, actielijst.</a></h3>
++		<em>Bespreekstuk</em>
++		
++	</div>
++	<div class="last">
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Vaststellen-van-het-verslag-van-de-vorige-raadsvergadering--actielijst-/notitie/" title="Notitie" class="note_hide" id="notelink844_2_"></a>
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Vaststellen-van-het-verslag-van-de-vorige-raadsvergadering--actielijst-"><span id="button844" class="play">&nbsp;</span></a>
++		
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Vaststellen-van-het-verslag-van-de-vorige-raadsvergadering--actielijst-"><span class="bijlage_true">&nbsp;</span></a>		
++	</div>
++	<div class="clearer"></div>
++
++	<div id="attachements_844" class="attachementRow attachement hide">
++		<div class="filmcontent">
++			<div id="film_844" class="film">
++				 
++				 
++				
++			</div>
++			<div id="fragmenten_844" class="fragments"></div>
++		</div>
++	
++	
++		<div id="persons_844" class="persons">
++			<div id="sprekers_844" class="speakers"></div>
++		</div>
++	
++		<div id="aanhetwoord_844" class="speaking"></div>
++		<div class="info">
++			<div id="meerinformatie_844" class="more">	<h4>Meer informatie:</h4>
++	<ul>
++		
++		
++		<li class="status">Bespreekstuk</li>
++		
++		
++		
++	</ul>
++	</div>
++			<div id="agendapunt_documenten_844" class="documents"></div>
++		</div>
++		<div class="clearer"></div>
++			
++	</div><!--eof attachementRow-->
++
++<div id="note844_2" class="note_hide">
++	<span>
++		&nbsp;
++	</span>
++</div>
++</li><!-- eof agendaRow--><li id="agendapunt845_157" class=" agendaRow">
++	<div class="first">
++		<a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Vragenrecht">4</a>
++	</div>
++	<div class="title">
++		<h3><a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Vragenrecht"> Vragenrecht</a></h3>
++		<em></em>
++		
++	</div>
++	<div class="last">
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Vragenrecht/notitie/" title="Notitie" class="note_hide" id="notelink845_2_"></a>
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Vragenrecht"><span id="button845" class="play">&nbsp;</span></a>
++		
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Vragenrecht"><span class="bijlage_false">&nbsp;</span></a>		
++	</div>
++	<div class="clearer"></div>
++
++	<div id="attachements_845" class="attachementRow attachement hide">
++		<div class="filmcontent">
++			<div id="film_845" class="film">
++				 
++				 
++				
++			</div>
++			<div id="fragmenten_845" class="fragments"></div>
++		</div>
++	
++	
++		<div id="persons_845" class="persons">
++			<div id="sprekers_845" class="speakers"></div>
++		</div>
++	
++		<div id="aanhetwoord_845" class="speaking"></div>
++		<div class="info">
++			<div id="meerinformatie_845" class="more">	<h4>Meer informatie:</h4>
++	<ul>
++		
++		
++		<li class="status">Bespreekstuk</li>
++		
++		
++		
++	</ul>
++	</div>
++			<div id="agendapunt_documenten_845" class="documents"></div>
++		</div>
++		<div class="clearer"></div>
++			
++	</div><!--eof attachementRow-->
++
++<div id="note845_2" class="note_hide">
++	<span>
++		&nbsp;
++	</span>
++</div>
++</li><!-- eof agendaRow--><li id="agendapunt846_0" class=" agendaRow">
++	<div class="first">
++		<a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Spreekrecht">5</a>
++	</div>
++	<div class="title">
++		<h3><a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Spreekrecht"> Spreekrecht</a></h3>
++		<em></em>
++		
++	</div>
++	<div class="last">
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Spreekrecht/notitie/" title="Notitie" class="note_hide" id="notelink846_2_"></a>
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Spreekrecht"><span id="button846" class="normaal">&nbsp;</span></a>
++		
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Spreekrecht"><span class="bijlage_false">&nbsp;</span></a>		
++	</div>
++	<div class="clearer"></div>
++
++	<div id="attachements_846" class="attachementRow attachement hide">
++		<div class="filmcontent">
++			<div id="film_846" class="film">
++				 
++				 
++				
++			</div>
++			<div id="fragmenten_846" class="fragments"></div>
++		</div>
++	
++	
++		<div id="persons_846" class="persons">
++			<div id="sprekers_846" class="speakers"></div>
++		</div>
++	
++		<div id="aanhetwoord_846" class="speaking"></div>
++		<div class="info">
++			<div id="meerinformatie_846" class="more">	<h4>Meer informatie:</h4>
++	<ul>
++		
++		
++		<li class="status">Bespreekstuk</li>
++		
++		
++		
++	</ul>
++	</div>
++			<div id="agendapunt_documenten_846" class="documents"></div>
++		</div>
++		<div class="clearer"></div>
++			
++	</div><!--eof attachementRow-->
++
++<div id="note846_2" class="note_hide">
++	<span>
++		&nbsp;
++	</span>
++</div>
++</li><!-- eof agendaRow--><li id="agendapunt847_0" class=" agendaRow">
++	<div class="first">
++		<a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Behandeling-agendapunten-ten-aanzien-waarvan-gebruik-is-gemaakt-van-het-Spreekrecht">6</a>
++	</div>
++	<div class="title">
++		<h3><a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Behandeling-agendapunten-ten-aanzien-waarvan-gebruik-is-gemaakt-van-het-Spreekrecht"> Behandeling agendapunten ten aanzien waarvan gebruik is gemaakt van het Spreekrecht</a></h3>
++		<em></em>
++		
++	</div>
++	<div class="last">
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Behandeling-agendapunten-ten-aanzien-waarvan-gebruik-is-gemaakt-van-het-Spreekrecht/notitie/" title="Notitie" class="note_hide" id="notelink847_2_"></a>
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Behandeling-agendapunten-ten-aanzien-waarvan-gebruik-is-gemaakt-van-het-Spreekrecht"><span id="button847" class="normaal">&nbsp;</span></a>
++		
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Behandeling-agendapunten-ten-aanzien-waarvan-gebruik-is-gemaakt-van-het-Spreekrecht"><span class="bijlage_false">&nbsp;</span></a>		
++	</div>
++	<div class="clearer"></div>
++
++	<div id="attachements_847" class="attachementRow attachement hide">
++		<div class="filmcontent">
++			<div id="film_847" class="film">
++				 
++				 
++				
++			</div>
++			<div id="fragmenten_847" class="fragments"></div>
++		</div>
++	
++	
++		<div id="persons_847" class="persons">
++			<div id="sprekers_847" class="speakers"></div>
++		</div>
++	
++		<div id="aanhetwoord_847" class="speaking"></div>
++		<div class="info">
++			<div id="meerinformatie_847" class="more">	<h4>Meer informatie:</h4>
++	<ul>
++		
++		
++		<li class="status">Bespreekstuk</li>
++		
++		
++		
++	</ul>
++	</div>
++			<div id="agendapunt_documenten_847" class="documents"></div>
++		</div>
++		<div class="clearer"></div>
++			
++	</div><!--eof attachementRow-->
++
++<div id="note847_2" class="note_hide">
++	<span>
++		&nbsp;
++	</span>
++</div>
++</li><!-- eof agendaRow--><li id="agendapunt848_158" class=" agendaRow">
++	<div class="first">
++		<a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Beeldkwaliteitsplan-Rietwijk--Ter-Borch-">7</a>
++	</div>
++	<div class="title">
++		<h3><a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Beeldkwaliteitsplan-Rietwijk--Ter-Borch-"> Beeldkwaliteitsplan Rietwijk (Ter Borch)</a></h3>
++		<em></em>
++		
++	</div>
++	<div class="last">
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Beeldkwaliteitsplan-Rietwijk--Ter-Borch-/notitie/" title="Notitie" class="note_hide" id="notelink848_2_"></a>
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Beeldkwaliteitsplan-Rietwijk--Ter-Borch-"><span id="button848" class="play">&nbsp;</span></a>
++		
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Beeldkwaliteitsplan-Rietwijk--Ter-Borch-"><span class="bijlage_true">&nbsp;</span></a>		
++	</div>
++	<div class="clearer"></div>
++
++	<div id="attachements_848" class="attachementRow attachement hide">
++		<div class="filmcontent">
++			<div id="film_848" class="film">
++				 
++				 
++				
++			</div>
++			<div id="fragmenten_848" class="fragments"></div>
++		</div>
++	
++	
++		<div id="persons_848" class="persons">
++			<div id="sprekers_848" class="speakers"></div>
++		</div>
++	
++		<div id="aanhetwoord_848" class="speaking"></div>
++		<div class="info">
++			<div id="meerinformatie_848" class="more">	<h4>Meer informatie:</h4>
++	<ul>
++		
++		
++		<li class="status">Bespreekstuk</li>
++		
++		
++		
++	</ul>
++	</div>
++			<div id="agendapunt_documenten_848" class="documents"></div>
++		</div>
++		<div class="clearer"></div>
++			
++	</div><!--eof attachementRow-->
++
++<div id="note848_2" class="note_hide">
++	<span>
++		&nbsp;
++	</span>
++</div>
++</li><!-- eof agendaRow--><li id="agendapunt849_159" class=" agendaRow">
++	<div class="first">
++		<a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Evaluatie-en-vaststellen-welstandsnota">8</a>
++	</div>
++	<div class="title">
++		<h3><a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Evaluatie-en-vaststellen-welstandsnota"> Evaluatie en vaststellen welstandsnota</a></h3>
++		<em></em>
++		
++	</div>
++	<div class="last">
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Evaluatie-en-vaststellen-welstandsnota/notitie/" title="Notitie" class="note_hide" id="notelink849_2_"></a>
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Evaluatie-en-vaststellen-welstandsnota"><span id="button849" class="play">&nbsp;</span></a>
++		
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Evaluatie-en-vaststellen-welstandsnota"><span class="bijlage_true">&nbsp;</span></a>		
++	</div>
++	<div class="clearer"></div>
++
++	<div id="attachements_849" class="attachementRow attachement hide">
++		<div class="filmcontent">
++			<div id="film_849" class="film">
++				 
++				 
++				
++			</div>
++			<div id="fragmenten_849" class="fragments"></div>
++		</div>
++	
++	
++		<div id="persons_849" class="persons">
++			<div id="sprekers_849" class="speakers"></div>
++		</div>
++	
++		<div id="aanhetwoord_849" class="speaking"></div>
++		<div class="info">
++			<div id="meerinformatie_849" class="more">	<h4>Meer informatie:</h4>
++	<ul>
++		
++		
++		<li class="status">Bespreekstuk</li>
++		
++		
++		
++	</ul>
++	</div>
++			<div id="agendapunt_documenten_849" class="documents"></div>
++		</div>
++		<div class="clearer"></div>
++			
++	</div><!--eof attachementRow-->
++
++<div id="note849_2" class="note_hide">
++	<span>
++		&nbsp;
++	</span>
++</div>
++</li><!-- eof agendaRow--><li id="agendapunt1014_161" class=" agendaRow">
++	<div class="first">
++		<a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Notitie-burgerlid-welstand">9</a>
++	</div>
++	<div class="title">
++		<h3><a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Notitie-burgerlid-welstand"> Notitie burgerlid welstand</a></h3>
++		<em></em>
++		
++	</div>
++	<div class="last">
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Notitie-burgerlid-welstand/notitie/" title="Notitie" class="note_hide" id="notelink1014_2_"></a>
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Notitie-burgerlid-welstand"><span id="button1014" class="play">&nbsp;</span></a>
++		
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Notitie-burgerlid-welstand"><span class="bijlage_true">&nbsp;</span></a>		
++	</div>
++	<div class="clearer"></div>
++
++	<div id="attachements_1014" class="attachementRow attachement hide">
++		<div class="filmcontent">
++			<div id="film_1014" class="film">
++				 
++				 
++				
++			</div>
++			<div id="fragmenten_1014" class="fragments"></div>
++		</div>
++	
++	
++		<div id="persons_1014" class="persons">
++			<div id="sprekers_1014" class="speakers"></div>
++		</div>
++	
++		<div id="aanhetwoord_1014" class="speaking"></div>
++		<div class="info">
++			<div id="meerinformatie_1014" class="more">	<h4>Meer informatie:</h4>
++	<ul>
++		
++		
++		<li class="status">Bespreekstuk</li>
++		
++		
++		
++	</ul>
++	</div>
++			<div id="agendapunt_documenten_1014" class="documents"></div>
++		</div>
++		<div class="clearer"></div>
++			
++	</div><!--eof attachementRow-->
++
++<div id="note1014_2" class="note_hide">
++	<span>
++		&nbsp;
++	</span>
++</div>
++</li><!-- eof agendaRow--><li id="agendapunt1018_162" class=" agendaRow">
++	<div class="first">
++		<a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Herziene-exploitatieopzet-uitbreiding-Donderen">10</a>
++	</div>
++	<div class="title">
++		<h3><a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Herziene-exploitatieopzet-uitbreiding-Donderen"> Herziene exploitatieopzet uitbreiding Donderen</a></h3>
++		<em></em>
++		
++	</div>
++	<div class="last">
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Herziene-exploitatieopzet-uitbreiding-Donderen/notitie/" title="Notitie" class="note_hide" id="notelink1018_2_"></a>
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Herziene-exploitatieopzet-uitbreiding-Donderen"><span id="button1018" class="play">&nbsp;</span></a>
++		
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Herziene-exploitatieopzet-uitbreiding-Donderen"><span class="bijlage_true">&nbsp;</span></a>		
++	</div>
++	<div class="clearer"></div>
++
++	<div id="attachements_1018" class="attachementRow attachement hide">
++		<div class="filmcontent">
++			<div id="film_1018" class="film">
++				 
++				 
++				
++			</div>
++			<div id="fragmenten_1018" class="fragments"></div>
++		</div>
++	
++	
++		<div id="persons_1018" class="persons">
++			<div id="sprekers_1018" class="speakers"></div>
++		</div>
++	
++		<div id="aanhetwoord_1018" class="speaking"></div>
++		<div class="info">
++			<div id="meerinformatie_1018" class="more">	<h4>Meer informatie:</h4>
++	<ul>
++		
++		
++		<li class="status">Bespreekstuk</li>
++		
++		
++		
++	</ul>
++	</div>
++			<div id="agendapunt_documenten_1018" class="documents"></div>
++		</div>
++		<div class="clearer"></div>
++			
++	</div><!--eof attachementRow-->
++
++<div id="note1018_2" class="note_hide">
++	<span>
++		&nbsp;
++	</span>
++</div>
++</li><!-- eof agendaRow--><li id="agendapunt1021_163" class=" agendaRow">
++	<div class="first">
++		<a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Voorbereidingsbesluit-voor-een-perceel-aan-de-Zuidlaarderweg-9-te-Tynaarlo">11</a>
++	</div>
++	<div class="title">
++		<h3><a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Voorbereidingsbesluit-voor-een-perceel-aan-de-Zuidlaarderweg-9-te-Tynaarlo"> Voorbereidingsbesluit voor een perceel aan de Zuidlaarderweg 9 te Tynaarlo</a></h3>
++		<em></em>
++		
++	</div>
++	<div class="last">
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Voorbereidingsbesluit-voor-een-perceel-aan-de-Zuidlaarderweg-9-te-Tynaarlo/notitie/" title="Notitie" class="note_hide" id="notelink1021_2_"></a>
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Voorbereidingsbesluit-voor-een-perceel-aan-de-Zuidlaarderweg-9-te-Tynaarlo"><span id="button1021" class="play">&nbsp;</span></a>
++		
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Voorbereidingsbesluit-voor-een-perceel-aan-de-Zuidlaarderweg-9-te-Tynaarlo"><span class="bijlage_true">&nbsp;</span></a>		
++	</div>
++	<div class="clearer"></div>
++
++	<div id="attachements_1021" class="attachementRow attachement hide">
++		<div class="filmcontent">
++			<div id="film_1021" class="film">
++				 
++				 
++				
++			</div>
++			<div id="fragmenten_1021" class="fragments"></div>
++		</div>
++	
++	
++		<div id="persons_1021" class="persons">
++			<div id="sprekers_1021" class="speakers"></div>
++		</div>
++	
++		<div id="aanhetwoord_1021" class="speaking"></div>
++		<div class="info">
++			<div id="meerinformatie_1021" class="more">	<h4>Meer informatie:</h4>
++	<ul>
++		
++		
++		<li class="status">Bespreekstuk</li>
++		
++		
++		
++	</ul>
++	</div>
++			<div id="agendapunt_documenten_1021" class="documents"></div>
++		</div>
++		<div class="clearer"></div>
++			
++	</div><!--eof attachementRow-->
++
++<div id="note1021_2" class="note_hide">
++	<span>
++		&nbsp;
++	</span>
++</div>
++</li><!-- eof agendaRow--><li id="agendapunt1024_164" class=" agendaRow">
++	<div class="first">
++		<a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Vaststellen-verordening-naamgeving-openbare-ruimten-en-nummering-gemeente-Tynaarlo-2008">12</a>
++	</div>
++	<div class="title">
++		<h3><a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Vaststellen-verordening-naamgeving-openbare-ruimten-en-nummering-gemeente-Tynaarlo-2008"> Vaststellen verordening naamgeving openbare ruimten en nummering gemeente Tynaarlo 2008</a></h3>
++		<em></em>
++		
++	</div>
++	<div class="last">
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Vaststellen-verordening-naamgeving-openbare-ruimten-en-nummering-gemeente-Tynaarlo-2008/notitie/" title="Notitie" class="note_hide" id="notelink1024_2_"></a>
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Vaststellen-verordening-naamgeving-openbare-ruimten-en-nummering-gemeente-Tynaarlo-2008"><span id="button1024" class="play">&nbsp;</span></a>
++		
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Vaststellen-verordening-naamgeving-openbare-ruimten-en-nummering-gemeente-Tynaarlo-2008"><span class="bijlage_true">&nbsp;</span></a>		
++	</div>
++	<div class="clearer"></div>
++
++	<div id="attachements_1024" class="attachementRow attachement hide">
++		<div class="filmcontent">
++			<div id="film_1024" class="film">
++				 
++				 
++				
++			</div>
++			<div id="fragmenten_1024" class="fragments"></div>
++		</div>
++	
++	
++		<div id="persons_1024" class="persons">
++			<div id="sprekers_1024" class="speakers"></div>
++		</div>
++	
++		<div id="aanhetwoord_1024" class="speaking"></div>
++		<div class="info">
++			<div id="meerinformatie_1024" class="more">	<h4>Meer informatie:</h4>
++	<ul>
++		
++		
++		<li class="status">Bespreekstuk</li>
++		
++		
++		
++	</ul>
++	</div>
++			<div id="agendapunt_documenten_1024" class="documents"></div>
++		</div>
++		<div class="clearer"></div>
++			
++	</div><!--eof attachementRow-->
++
++<div id="note1024_2" class="note_hide">
++	<span>
++		&nbsp;
++	</span>
++</div>
++</li><!-- eof agendaRow--><li id="agendapunt1027_165" class=" agendaRow">
++	<div class="first">
++		<a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Concept---opdracht-voor-een-vervolgonderzoek-VROM-–-rapport-De-Punt">13</a>
++	</div>
++	<div class="title">
++		<h3><a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Concept---opdracht-voor-een-vervolgonderzoek-VROM-–-rapport-De-Punt"> Concept - opdracht voor een vervolgonderzoek VROM – rapport De Punt</a></h3>
++		<em></em>
++		
++	</div>
++	<div class="last">
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Concept---opdracht-voor-een-vervolgonderzoek-VROM-–-rapport-De-Punt/notitie/" title="Notitie" class="note_hide" id="notelink1027_2_"></a>
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Concept---opdracht-voor-een-vervolgonderzoek-VROM-–-rapport-De-Punt"><span id="button1027" class="play">&nbsp;</span></a>
++		
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Concept---opdracht-voor-een-vervolgonderzoek-VROM-–-rapport-De-Punt"><span class="bijlage_true">&nbsp;</span></a>		
++	</div>
++	<div class="clearer"></div>
++
++	<div id="attachements_1027" class="attachementRow attachement hide">
++		<div class="filmcontent">
++			<div id="film_1027" class="film">
++				 
++				 
++				
++			</div>
++			<div id="fragmenten_1027" class="fragments"></div>
++		</div>
++	
++	
++		<div id="persons_1027" class="persons">
++			<div id="sprekers_1027" class="speakers"></div>
++		</div>
++	
++		<div id="aanhetwoord_1027" class="speaking"></div>
++		<div class="info">
++			<div id="meerinformatie_1027" class="more">	<h4>Meer informatie:</h4>
++	<ul>
++		
++		
++		<li class="status">Bespreekstuk</li>
++		
++		
++		
++	</ul>
++	</div>
++			<div id="agendapunt_documenten_1027" class="documents"></div>
++		</div>
++		<div class="clearer"></div>
++			
++	</div><!--eof attachementRow-->
++
++<div id="note1027_2" class="note_hide">
++	<span>
++		&nbsp;
++	</span>
++</div>
++</li><!-- eof agendaRow--><li id="agendapunt1030_169" class=" agendaRow">
++	<div class="first">
++		<a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Bomenstructuurplan">14</a>
++	</div>
++	<div class="title">
++		<h3><a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Bomenstructuurplan"> Bomenstructuurplan</a></h3>
++		<em></em>
++		
++	</div>
++	<div class="last">
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Bomenstructuurplan/notitie/" title="Notitie" class="note_hide" id="notelink1030_2_"></a>
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Bomenstructuurplan"><span id="button1030" class="play">&nbsp;</span></a>
++		
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Bomenstructuurplan"><span class="bijlage_true">&nbsp;</span></a>		
++	</div>
++	<div class="clearer"></div>
++
++	<div id="attachements_1030" class="attachementRow attachement hide">
++		<div class="filmcontent">
++			<div id="film_1030" class="film">
++				 
++				 
++				
++			</div>
++			<div id="fragmenten_1030" class="fragments"></div>
++		</div>
++	
++	
++		<div id="persons_1030" class="persons">
++			<div id="sprekers_1030" class="speakers"></div>
++		</div>
++	
++		<div id="aanhetwoord_1030" class="speaking"></div>
++		<div class="info">
++			<div id="meerinformatie_1030" class="more">	<h4>Meer informatie:</h4>
++	<ul>
++		
++		
++		<li class="status">Bespreekstuk</li>
++		
++		
++		
++	</ul>
++	</div>
++			<div id="agendapunt_documenten_1030" class="documents"></div>
++		</div>
++		<div class="clearer"></div>
++			
++	</div><!--eof attachementRow-->
++
++<div id="note1030_2" class="note_hide">
++	<span>
++		&nbsp;
++	</span>
++</div>
++</li><!-- eof agendaRow--><li id="agendapunt1038_0" class=" agendaRow">
++	<div class="first">
++		<a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Initiatiefvoorstel--vaststelling-verordening-VROM-starterslening-gemeente-Tynaarlo---op-verzoek-fractie-Leefbaar-Tynaarlo-">15</a>
++	</div>
++	<div class="title">
++		<h3><a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Initiatiefvoorstel--vaststelling-verordening-VROM-starterslening-gemeente-Tynaarlo---op-verzoek-fractie-Leefbaar-Tynaarlo-"> Initiatiefvoorstel “vaststelling verordening VROM starterslening gemeente Tynaarlo” (op verzoek fractie Leefbaar Tynaarlo)</a></h3>
++		<em></em>
++		
++	</div>
++	<div class="last">
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Initiatiefvoorstel--vaststelling-verordening-VROM-starterslening-gemeente-Tynaarlo---op-verzoek-fractie-Leefbaar-Tynaarlo-/notitie/" title="Notitie" class="note_hide" id="notelink1038_2_"></a>
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Initiatiefvoorstel--vaststelling-verordening-VROM-starterslening-gemeente-Tynaarlo---op-verzoek-fractie-Leefbaar-Tynaarlo-"><span id="button1038" class="normaal">&nbsp;</span></a>
++		
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Initiatiefvoorstel--vaststelling-verordening-VROM-starterslening-gemeente-Tynaarlo---op-verzoek-fractie-Leefbaar-Tynaarlo-"><span class="bijlage_true">&nbsp;</span></a>		
++	</div>
++	<div class="clearer"></div>
++
++	<div id="attachements_1038" class="attachementRow attachement hide">
++		<div class="filmcontent">
++			<div id="film_1038" class="film">
++				 
++				 
++				
++			</div>
++			<div id="fragmenten_1038" class="fragments"></div>
++		</div>
++	
++	
++		<div id="persons_1038" class="persons">
++			<div id="sprekers_1038" class="speakers"></div>
++		</div>
++	
++		<div id="aanhetwoord_1038" class="speaking"></div>
++		<div class="info">
++			<div id="meerinformatie_1038" class="more">	<h4>Meer informatie:</h4>
++	<ul>
++		
++		
++		<li class="status">Bespreekstuk</li>
++		
++		
++		
++	</ul>
++	</div>
++			<div id="agendapunt_documenten_1038" class="documents"></div>
++		</div>
++		<div class="clearer"></div>
++			
++	</div><!--eof attachementRow-->
++
++<div id="note1038_2" class="note_hide">
++	<span>
++		&nbsp;
++	</span>
++</div>
++</li><!-- eof agendaRow--><li id="agendapunt1042_0" class=" agendaRow">
++	<div class="first">
++		<a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Initiatiefvoorstel--besluit-beschikbaarstelling-bedrag-VROM-starterslening---op-verzoek-fractie-Leefbaar-Tynaarlo-">16</a>
++	</div>
++	<div class="title">
++		<h3><a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Initiatiefvoorstel--besluit-beschikbaarstelling-bedrag-VROM-starterslening---op-verzoek-fractie-Leefbaar-Tynaarlo-"> Initiatiefvoorstel “besluit beschikbaarstelling bedrag VROM-starterslening” (op verzoek fractie Leefbaar Tynaarlo)</a></h3>
++		<em></em>
++		
++	</div>
++	<div class="last">
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Initiatiefvoorstel--besluit-beschikbaarstelling-bedrag-VROM-starterslening---op-verzoek-fractie-Leefbaar-Tynaarlo-/notitie/" title="Notitie" class="note_hide" id="notelink1042_2_"></a>
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Initiatiefvoorstel--besluit-beschikbaarstelling-bedrag-VROM-starterslening---op-verzoek-fractie-Leefbaar-Tynaarlo-"><span id="button1042" class="normaal">&nbsp;</span></a>
++		
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Initiatiefvoorstel--besluit-beschikbaarstelling-bedrag-VROM-starterslening---op-verzoek-fractie-Leefbaar-Tynaarlo-"><span class="bijlage_true">&nbsp;</span></a>		
++	</div>
++	<div class="clearer"></div>
++
++	<div id="attachements_1042" class="attachementRow attachement hide">
++		<div class="filmcontent">
++			<div id="film_1042" class="film">
++				 
++				 
++				
++			</div>
++			<div id="fragmenten_1042" class="fragments"></div>
++		</div>
++	
++	
++		<div id="persons_1042" class="persons">
++			<div id="sprekers_1042" class="speakers"></div>
++		</div>
++	
++		<div id="aanhetwoord_1042" class="speaking"></div>
++		<div class="info">
++			<div id="meerinformatie_1042" class="more">	<h4>Meer informatie:</h4>
++	<ul>
++		
++		
++		<li class="status">Bespreekstuk</li>
++		
++		
++		
++	</ul>
++	</div>
++			<div id="agendapunt_documenten_1042" class="documents"></div>
++		</div>
++		<div class="clearer"></div>
++			
++	</div><!--eof attachementRow-->
++
++<div id="note1042_2" class="note_hide">
++	<span>
++		&nbsp;
++	</span>
++</div>
++</li><!-- eof agendaRow--><li id="agendapunt1045_167" class=" agendaRow">
++	<div class="first">
++		<a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Nota-kapitaalgoederen">17</a>
++	</div>
++	<div class="title">
++		<h3><a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Nota-kapitaalgoederen"> Nota kapitaalgoederen</a></h3>
++		<em></em>
++		
++	</div>
++	<div class="last">
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Nota-kapitaalgoederen/notitie/" title="Notitie" class="note_hide" id="notelink1045_2_"></a>
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Nota-kapitaalgoederen"><span id="button1045" class="play">&nbsp;</span></a>
++		
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Nota-kapitaalgoederen"><span class="bijlage_true">&nbsp;</span></a>		
++	</div>
++	<div class="clearer"></div>
++
++	<div id="attachements_1045" class="attachementRow attachement hide">
++		<div class="filmcontent">
++			<div id="film_1045" class="film">
++				 
++				 
++				
++			</div>
++			<div id="fragmenten_1045" class="fragments"></div>
++		</div>
++	
++	
++		<div id="persons_1045" class="persons">
++			<div id="sprekers_1045" class="speakers"></div>
++		</div>
++	
++		<div id="aanhetwoord_1045" class="speaking"></div>
++		<div class="info">
++			<div id="meerinformatie_1045" class="more">	<h4>Meer informatie:</h4>
++	<ul>
++		
++		
++		<li class="status">Bespreekstuk</li>
++		
++		
++		
++	</ul>
++	</div>
++			<div id="agendapunt_documenten_1045" class="documents"></div>
++		</div>
++		<div class="clearer"></div>
++			
++	</div><!--eof attachementRow-->
++
++<div id="note1045_2" class="note_hide">
++	<span>
++		&nbsp;
++	</span>
++</div>
++</li><!-- eof agendaRow--><li id="agendapunt1049_168" class=" agendaRow">
++	<div class="first">
++		<a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Begrotingswijzigingen">18</a>
++	</div>
++	<div class="title">
++		<h3><a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Begrotingswijzigingen"> Begrotingswijzigingen</a></h3>
++		<em></em>
++		
++	</div>
++	<div class="last">
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Begrotingswijzigingen/notitie/" title="Notitie" class="note_hide" id="notelink1049_2_"></a>
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Begrotingswijzigingen"><span id="button1049" class="play">&nbsp;</span></a>
++		
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Begrotingswijzigingen"><span class="bijlage_true">&nbsp;</span></a>		
++	</div>
++	<div class="clearer"></div>
++
++	<div id="attachements_1049" class="attachementRow attachement hide">
++		<div class="filmcontent">
++			<div id="film_1049" class="film">
++				 
++				 
++				
++			</div>
++			<div id="fragmenten_1049" class="fragments"></div>
++		</div>
++	
++	
++		<div id="persons_1049" class="persons">
++			<div id="sprekers_1049" class="speakers"></div>
++		</div>
++	
++		<div id="aanhetwoord_1049" class="speaking"></div>
++		<div class="info">
++			<div id="meerinformatie_1049" class="more">	<h4>Meer informatie:</h4>
++	<ul>
++		
++		
++		<li class="status">Bespreekstuk</li>
++		
++		
++		
++	</ul>
++	</div>
++			<div id="agendapunt_documenten_1049" class="documents"></div>
++		</div>
++		<div class="clearer"></div>
++			
++	</div><!--eof attachementRow-->
++
++<div id="note1049_2" class="note_hide">
++	<span>
++		&nbsp;
++	</span>
++</div>
++</li><!-- eof agendaRow--><li id="agendapunt1052_0" class=" agendaRow">
++	<div class="first">
++		<a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Informatie-uit-het-college---namens-het-college">19</a>
++	</div>
++	<div class="title">
++		<h3><a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Informatie-uit-het-college---namens-het-college"> Informatie uit het college / namens het college</a></h3>
++		<em></em>
++		
++	</div>
++	<div class="last">
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Informatie-uit-het-college---namens-het-college/notitie/" title="Notitie" class="note_hide" id="notelink1052_2_"></a>
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Informatie-uit-het-college---namens-het-college"><span id="button1052" class="normaal">&nbsp;</span></a>
++		
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Informatie-uit-het-college---namens-het-college"><span class="bijlage_false">&nbsp;</span></a>		
++	</div>
++	<div class="clearer"></div>
++
++	<div id="attachements_1052" class="attachementRow attachement hide">
++		<div class="filmcontent">
++			<div id="film_1052" class="film">
++				 
++				 
++				
++			</div>
++			<div id="fragmenten_1052" class="fragments"></div>
++		</div>
++	
++	
++		<div id="persons_1052" class="persons">
++			<div id="sprekers_1052" class="speakers"></div>
++		</div>
++	
++		<div id="aanhetwoord_1052" class="speaking"></div>
++		<div class="info">
++			<div id="meerinformatie_1052" class="more">	<h4>Meer informatie:</h4>
++	<ul>
++		
++		
++		<li class="status">Bespreekstuk</li>
++		
++		
++		
++	</ul>
++	</div>
++			<div id="agendapunt_documenten_1052" class="documents"></div>
++		</div>
++		<div class="clearer"></div>
++			
++	</div><!--eof attachementRow-->
++
++<div id="note1052_2" class="note_hide">
++	<span>
++		&nbsp;
++	</span>
++</div>
++</li><!-- eof agendaRow--><li id="agendapunt850_0" class=" agendaRow">
++	<div class="first">
++		<a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Ingekomen-stukken">20</a>
++	</div>
++	<div class="title">
++		<h3><a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Ingekomen-stukken"> Ingekomen stukken</a></h3>
++		<em>Bespreekstuk</em>
++		
++	</div>
++	<div class="last">
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Ingekomen-stukken/notitie/" title="Notitie" class="note_hide" id="notelink850_2_"></a>
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Ingekomen-stukken"><span id="button850" class="normaal">&nbsp;</span></a>
++		
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Ingekomen-stukken"><span class="bijlage_true">&nbsp;</span></a>		
++	</div>
++	<div class="clearer"></div>
++
++	<div id="attachements_850" class="attachementRow attachement hide">
++		<div class="filmcontent">
++			<div id="film_850" class="film">
++				 
++				 
++				
++			</div>
++			<div id="fragmenten_850" class="fragments"></div>
++		</div>
++	
++	
++		<div id="persons_850" class="persons">
++			<div id="sprekers_850" class="speakers"></div>
++		</div>
++	
++		<div id="aanhetwoord_850" class="speaking"></div>
++		<div class="info">
++			<div id="meerinformatie_850" class="more">	<h4>Meer informatie:</h4>
++	<ul>
++		
++		
++		<li class="status">Bespreekstuk</li>
++		
++		
++		
++	</ul>
++	</div>
++			<div id="agendapunt_documenten_850" class="documents"></div>
++		</div>
++		<div class="clearer"></div>
++			
++	</div><!--eof attachementRow-->
++
++<div id="note850_2" class="note_hide">
++	<span>
++		&nbsp;
++	</span>
++</div>
++</li><!-- eof agendaRow--><li id="agendapunt851_0" class=" agendaRow">
++	<div class="first">
++		<a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Stukken-in-de-leesmap-ter-kennisneming">21</a>
++	</div>
++	<div class="title">
++		<h3><a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Stukken-in-de-leesmap-ter-kennisneming"> Stukken in de leesmap ter kennisneming</a></h3>
++		<em>Bespreekstuk</em>
++		
++	</div>
++	<div class="last">
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Stukken-in-de-leesmap-ter-kennisneming/notitie/" title="Notitie" class="note_hide" id="notelink851_2_"></a>
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Stukken-in-de-leesmap-ter-kennisneming"><span id="button851" class="normaal">&nbsp;</span></a>
++		
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Stukken-in-de-leesmap-ter-kennisneming"><span class="bijlage_false">&nbsp;</span></a>		
++	</div>
++	<div class="clearer"></div>
++
++	<div id="attachements_851" class="attachementRow attachement hide">
++		<div class="filmcontent">
++			<div id="film_851" class="film">
++				 
++				 
++				
++			</div>
++			<div id="fragmenten_851" class="fragments"></div>
++		</div>
++	
++	
++		<div id="persons_851" class="persons">
++			<div id="sprekers_851" class="speakers"></div>
++		</div>
++	
++		<div id="aanhetwoord_851" class="speaking"></div>
++		<div class="info">
++			<div id="meerinformatie_851" class="more">	<h4>Meer informatie:</h4>
++	<ul>
++		
++		
++		<li class="status">Bespreekstuk</li>
++		
++		
++		
++	</ul>
++	</div>
++			<div id="agendapunt_documenten_851" class="documents"></div>
++		</div>
++		<div class="clearer"></div>
++			
++	</div><!--eof attachementRow-->
++
++<div id="note851_2" class="note_hide">
++	<span>
++		&nbsp;
++	</span>
++</div>
++</li><!-- eof agendaRow--><li id="agendapunt852_0" class=" agendaRow">
++	<div class="first">
++		<a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Gemeenschappelijke-regelingen">22</a>
++	</div>
++	<div class="title">
++		<h3><a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Gemeenschappelijke-regelingen"> Gemeenschappelijke regelingen</a></h3>
++		<em>Bespreekstuk</em>
++		
++	</div>
++	<div class="last">
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Gemeenschappelijke-regelingen/notitie/" title="Notitie" class="note_hide" id="notelink852_2_"></a>
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Gemeenschappelijke-regelingen"><span id="button852" class="normaal">&nbsp;</span></a>
++		
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Gemeenschappelijke-regelingen"><span class="bijlage_false">&nbsp;</span></a>		
++	</div>
++	<div class="clearer"></div>
++
++	<div id="attachements_852" class="attachementRow attachement hide">
++		<div class="filmcontent">
++			<div id="film_852" class="film">
++				 
++				 
++				
++			</div>
++			<div id="fragmenten_852" class="fragments"></div>
++		</div>
++	
++	
++		<div id="persons_852" class="persons">
++			<div id="sprekers_852" class="speakers"></div>
++		</div>
++	
++		<div id="aanhetwoord_852" class="speaking"></div>
++		<div class="info">
++			<div id="meerinformatie_852" class="more">	<h4>Meer informatie:</h4>
++	<ul>
++		
++		
++		<li class="status">Bespreekstuk</li>
++		
++		
++		
++	</ul>
++	</div>
++			<div id="agendapunt_documenten_852" class="documents"></div>
++		</div>
++		<div class="clearer"></div>
++			
++	</div><!--eof attachementRow-->
++
++<div id="note852_2" class="note_hide">
++	<span>
++		&nbsp;
++	</span>
++</div>
++</li><!-- eof agendaRow--><li id="agendapunt853_0" class=" agendaRow">
++	<div class="first">
++		<a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Sluiting">23</a>
++	</div>
++	<div class="title">
++		<h3><a class="" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Sluiting"> Sluiting</a></h3>
++		<em>Bespreekstuk</em>
++		
++	</div>
++	<div class="last">
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Sluiting/notitie/" title="Notitie" class="note_hide" id="notelink853_2_"></a>
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Sluiting"><span id="button853" class="normaal">&nbsp;</span></a>
++		
++		<a href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/Sluiting"><span class="bijlage_false">&nbsp;</span></a>		
++	</div>
++	<div class="clearer"></div>
++
++	<div id="attachements_853" class="attachementRow attachement hide">
++		<div class="filmcontent">
++			<div id="film_853" class="film">
++				 
++				 
++				
++			</div>
++			<div id="fragmenten_853" class="fragments"></div>
++		</div>
++	
++	
++		<div id="persons_853" class="persons">
++			<div id="sprekers_853" class="speakers"></div>
++		</div>
++	
++		<div id="aanhetwoord_853" class="speaking"></div>
++		<div class="info">
++			<div id="meerinformatie_853" class="more">	<h4>Meer informatie:</h4>
++	<ul>
++		
++		
++		<li class="status">Bespreekstuk</li>
++		
++		
++		
++	</ul>
++	</div>
++			<div id="agendapunt_documenten_853" class="documents"></div>
++		</div>
++		<div class="clearer"></div>
++			
++	</div><!--eof attachementRow-->
++
++<div id="note853_2" class="note_hide">
++	<span>
++		&nbsp;
++	</span>
++</div>
++</li><!-- eof agendaRow-->
++</ul><!--eof vergadering-->
++<input type="hidden" name="fragment" id="fragment" value="" />
++
++				</div>
++				<div id="documenten">
++					
++				</div>
++				<div id="downloaden">
++					
++				</div>
++				<div id="status_uitzending"></div>
++				<div id="presentation">
++					<img id="vergroten" src="/md/zoomDoc.gif" alt="afbeelding vergroten" onclick="togglesize('#presentation_sheet')" />
++				</div>
++			</div>
++					
++		<div id="header">
++			<div id="logo"><a href="/" title="Terug naar home">&nbsp;</a></div>
++			<h2 class="nonvisual">Site Navigatie</h2>
++			<h3 class="nonvisual">Hoofdmenu</h3>
++<ul id="menu">
++<li><a href="/"><span>welkom</span></a></li>
++<li><a href="/Organisatie"><span>organisatie</span></a></li>
++<li><a class="active" href="/Vergaderingen"><span>vergaderingen</span></a></li>
++<li><a href="/Nieuws"><span>nieuws</span></a></li>
++<li><a href="/Themas"><span>thema's</span></a></li>
++<li><a href="/Abonnement"><span>abonnement</span></a></li>
++</ul>	
++			
++			<div id="action_menu">
++				<h3 class="nonvisual">Pagina opties</h3>
++<ul>
++	<!--li><a class="rss" href="/rss_vergaderingen">rss</a></li-->
++	<li><a class="print" href="/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/print">Afdrukken</a></li>
++	<!--li><a class="readspeak" href="/">Lees voor</a></li-->
++	<li>
++		<a class="text_sml" href="/zoom/level1">a</a>
++		<a class="text_mid" href="/zoom/level2">a</a>
++		<a class="text_lrg" href="/zoom/level3">a</a>
++	</li>
++</ul>
++				<div id="document_legend" class="active">
++					<h3>Legenda</h3>
++<ul>	<li class="aangeboden">Aangeboden</li>		<li class="actielijst-met-toezeggingen">Actielijst met toezeggingen</li>		<li class="agenda">Agenda</li>		<li class="amendement">Amendement</li>		<li class="begroting">Begroting</li>		<li class="begrotingswijziging">Begrotingswijziging</li>		<li class="beschouwingen-voorjaarsnota-en-perspectievennota">Beschouwingen voorjaarsnota en perspectievennota</li>		<li class="besluitenlijst-raadsvergadering">Besluitenlijst raadsvergadering</li>		<li class="bijlage">Bijlage</li>		<li class="brieven-van-buiten">Brieven van buiten</li>		<li class="informatie-uit-of-namens-het-college">Informatie uit of namens het college</li>		<li class="ingekomen-brieven">ingekomen brieven</li>		<li class="ingekomen-stukkenlijst">Ingekomen stukkenlijst</li>		<li class="inhoud-map-losse-stukken">Inhoud map losse stukken</li>		<li class="lange-termijn-agenda">Lange termijn agenda</li>		<li class="lange-termijnagenda">Lange termijnagenda</li>		<li class="mededelingen">Mededelingen</li>		<li class="motie">Motie</li>		<li class="najaarsnota">Najaarsnota</li>		<li class="nieuwsbrieven">Nieuwsbrieven</li>		<li class="overig">Overig</li>		<li class="persbericht">Persbericht</li>		<li class="raadsbesluit">Raadsbesluit</li>		<li class="raadsvoorstel">Raadsvoorstel</li>		<li class="stukken-ter-inzage">Stukken ter inzage</li>		<li class="stukken-ter-kennisname">Stukken ter kennisname</li>		<li class="toelichting">Toelichting</li>		<li class="tvb">TVB</li>		<li class="uitnodigingen">Uitnodigingen</li>		<li class="uitnodigingen-">Uitnodigingen-</li>		<li class="vergaderschema">Vergaderschema</li>		<li class="verordening">Verordening</li>		<li class="wandelgang">Wandelgang</li>		<li class="zienswijzennotitie">Zienswijzennotitie</li>		<li class="zip-bestand">Zip bestand</li>		<li class="vertrouwlijk">Vertrouwelijk document</li>	
++</ul>
++
++
++				</div>				
++			</div>					
++					
++			
++			<div id="header_navigation">
++				
++				<h3 class="nonvisual">Over deze site</h3>
++<ul>
++	<li><a class="contact" href="/Over-deze-site/Contact/">Contact</a></li>
++	<li><a class="proclaimer" href="/Over-deze-site/Proclaimer/">Proclaimer</a></li>
++	<li><a class="colofon" href="/Over-deze-site/Colofon/">Colofon</a></li>	
++	<li><a class="home" href="/"><span>welkom</span></a></li>
++</ul>	
++			</div>
++
++			<div id="inloggen">
++				
++				<h3 class="nonvisual">Inloggen</h3>
++<p class="nonvisual">U kunt inloggen als raadslid: </p><a id="inloggen_link" href="/inloggen?url=/Vergaderingen/Gemeenteraad/2008/14-oktober/20:00/">Inloggen</a>
++
++			</div>
++			
++			<div id="search">
++				<!-- Zoeken -->
++	<h3 class="nonvisual" id="zoeken">Zoeken</h3>
++	<form action="/zoek/" method="post">
++		<fieldset>
++			<legend>Snelzoeken</legend>
++			<input type="text" id="q" name="zoek_opdracht" value="Uw zoekopdracht" />
++			<input type="submit" id="search_button" name="vind" value="" />
++			<input type="hidden" value="alle_woorden" class="hidden" name="search" />
++			<a href="/zoeken/">Geavanceerd zoeken</a>
++		</fieldset>
++	</form>
++			</div>		
++			
++		</div>	
++		
++			</div> <!--EOF container -->
++			<!-- Footer -->
++			<h2 class="hidden">Contact gegevens</h2>
++			
++			<div id="footer">
++				<div id="footerinner">
++	
++	<div id="footerright">
++		<h3> Snel naar </h3>
++		<ul>
++			<li><a href="/">Home </a></li>
++			<li><a href="/sitemap">Sitemap </a></li>
++			<li><a href="/zoeken">Zoeken </a></li>
++		</ul>
++
++	</div>
++	
++	<a href="#top" title="terug naar boven" id="back"><span>Terug naar boven</span></a>
++</div>
++
++			</div>	<!--EOF footer-->	
++</body>
++</html><!-- t:0.200307 -->
+\ No newline at end of file
+Index: src/plugin/badencoding-detector/build.xml
+===================================================================
+--- src/plugin/badencoding-detector/build.xml	(revision 0)
++++ src/plugin/badencoding-detector/build.xml	(revision 0)
+@@ -0,0 +1,27 @@
++<?xml version="1.0"?>
++<!--
++ Licensed to the Apache Software Foundation (ASF) under one or more
++ contributor license agreements.  See the NOTICE file distributed with
++ this work for additional information regarding copyright ownership.
++ The ASF licenses this file to You under the Apache License, Version 2.0
++ (the "License"); you may not use this file except in compliance with
++ the License.  You may obtain a copy of the License at
++
++     http://www.apache.org/licenses/LICENSE-2.0
++
++ Unless required by applicable law or agreed to in writing, software
++ distributed under the License is distributed on an "AS IS" BASIS,
++ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ See the License for the specific language governing permissions and
++ limitations under the License.
++-->
++<project name="badencoding-detector" default="jar-core">
++
++  <import file="../build-plugin.xml"/>
++
++  <!-- for junit test -->
++  <mkdir dir="${build.test}/test-documents"/>
++  <copy todir="${build.test}/test-documents">
++    <fileset dir="test-documents" />
++  </copy>
++</project>
