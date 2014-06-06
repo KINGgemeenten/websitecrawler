@@ -1,6 +1,6 @@
 Index: src/plugin/build.xml
 ===================================================================
---- src/plugin/build.xml	(revision 1600637)
+--- src/plugin/build.xml	(revision 1600860)
 +++ src/plugin/build.xml	(working copy)
 @@ -26,6 +26,7 @@
    <!-- Build & deploy all the plugin jars.                    -->
@@ -157,6 +157,8 @@ Index: src/plugin/badencoding-detector/src/test/io/openindex/nutch/parse/badenco
 +    
 +    int numBadUrls = 0;
 +    
++    System.out.println("FILE:: " + url);
++
 +    try {
 +      BufferedReader bufferedReader = new BufferedReader(reader);
 +      String line = null;
@@ -164,6 +166,7 @@ Index: src/plugin/badencoding-detector/src/test/io/openindex/nutch/parse/badenco
 +        html.append(line);
 +      }
 +    } catch ( IOException e) {
++      System.out.println("BufferedReader error: ");
 +      e.printStackTrace();
 +      return false;
 +    }
@@ -176,8 +179,10 @@ Index: src/plugin/badencoding-detector/src/test/io/openindex/nutch/parse/badenco
 +      
 +      numBadUrls = filter.findBadURLs(parseData.getOutlinks());
 +    } catch (Exception e) {
-+      LOG.error("Error parsing: StringUtils.stringifyException(e));
++      LOG.error("Error parsing: "); System.out.println(StringUtils.stringifyException(e));
 +    }
++
++    System.out.println(numBadUrls + "\t" + uri + "\n");
 +
 +    return numBadUrls > 0 ? true : false;
 +  }
@@ -187,7 +192,7 @@ Index: src/plugin/badencoding-detector/src/java/io/openindex/nutch/parse/badenco
 ===================================================================
 --- src/plugin/badencoding-detector/src/java/io/openindex/nutch/parse/badencoding/BadEncodingParseFilter.java	(revision 0)
 +++ src/plugin/badencoding-detector/src/java/io/openindex/nutch/parse/badencoding/BadEncodingParseFilter.java	(revision 0)
-@@ -0,0 +1,166 @@
+@@ -0,0 +1,162 @@
 +
 +/**
 + * Licensed to the Apache Software Foundation (ASF) under one or more
@@ -307,7 +312,7 @@ Index: src/plugin/badencoding-detector/src/java/io/openindex/nutch/parse/badenco
 +  public int findBadURLs(Outlink[] outlinks) {
 +    // Out counter
 +    int numBadURLs = 0;
-+    
++        
 +    for (int i = 0; i < outlinks.length; i++) {
 +      // Get the target
 +      String target = outlinks[i].getToUrl();
