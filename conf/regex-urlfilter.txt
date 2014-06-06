@@ -8,7 +8,7 @@
 # new version doesn't filter domains/hosts
 #-http://.+/feed|/rss|/atom[/]?$
 # also skip print versions
--http://.+/feed|/rss\/print|/atom[/]?$
+-http://.+/feed|/rss|/print|/atom[/]?$
 
 # Skip URL's with one of the calendar terms loosely followed by three digits seperated by a character
 # FIXED: incorrectly filters http://beleidsagenda.nl/10/13/15/nieuws.html (term in FQDN issue)
