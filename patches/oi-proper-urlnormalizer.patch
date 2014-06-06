@@ -1,0 +1,196 @@
+Index: src/plugin/urlnormalizer-basic/src/test/org/apache/nutch/net/urlnormalizer/basic/TestBasicURLNormalizer.java
+===================================================================
+--- src/plugin/urlnormalizer-basic/src/test/org/apache/nutch/net/urlnormalizer/basic/TestBasicURLNormalizer.java	(revision 1600845)
++++ src/plugin/urlnormalizer-basic/src/test/org/apache/nutch/net/urlnormalizer/basic/TestBasicURLNormalizer.java	(working copy)
+@@ -103,9 +103,58 @@
+                   "http://foo.com/aa/bb/foo.html" );
+     normalizeTest("http://foo.com////aa////bb////foo.html",
+                   "http://foo.com/aa/bb/foo.html" );
++                  
++    // check that % encoding is normalized
++    normalizeTest("http://foo.com/%66oo.html", "http://foo.com/foo.html");
++
++    // check that % encoding works correctly at end of URL
++    normalizeTest("http://foo.com/%66oo.htm%6c", "http://foo.com/foo.html");
++    normalizeTest("http://foo.com/%66oo.ht%6dl", "http://foo.com/foo.html");
++
++    // check that % decoder do not overlap strings
++    normalizeTest("http://foo.com/%66oo.ht%6d%6c", "http://foo.com/foo.html");
++    
++    // check that % decoder leaves high bit chars alone
++    normalizeTest("http://foo.com/%66oo.htm%C0", "http://foo.com/foo.htm%C0");
++
++    // check that % decoder leaves control chars alone
++    normalizeTest("http://foo.com/%66oo.htm%1A", "http://foo.com/foo.htm%1A");
++
++    // check that % decoder converts to upper case letters
++    normalizeTest("http://foo.com/%66oo.htm%c0", "http://foo.com/foo.htm%C0");
++
++    // check that % decoder leaves encoded spaces alone
++    normalizeTest("http://foo.com/you%20too.html", "http://foo.com/you%20too.html");
++
++    // check that spaces are encoded into %20
++    normalizeTest("http://foo.com/you too.html", "http://foo.com/you%20too.html");
++    
++    // check that encoded # are not decoded
++    normalizeTest("http://foo.com/file.html%23cz", "http://foo.com/file.html%23cz");
++
++    // check that encoded / are not decoded
++    normalizeTest("http://foo.com/fast/dir%2fcz", "http://foo.com/fast/dir%2Fcz");
++
++    // check that control chars are encoded
++    normalizeTest("http://foo.com/\u001a!", "http://foo.com/%1A!");
++
++    // check that control chars are always encoded into 2 digits
++    normalizeTest("http://foo.com/\u0001!", "http://foo.com/%01!");
++
++    // check encoding of spanish chars
++    normalizeTest("http://mydomain.com/en Espa\u00F1ol.aspx", "http://mydomain.com/en%20Espa%C3%B1ol.aspx");
++    
++    // check wiki
++    normalizeTest("http://nl.wikipedia.org/wiki/Aaron_Sáenz", "http://nl.wikipedia.org/wiki/Aaron_S%C3%A1enz");
++    normalizeTest("http://nl.wikipedia.org/wiki/Aaron_S%C3%A1enz", "http://nl.wikipedia.org/wiki/Aaron_S%C3%A1enz");
++
++    // check apotheek
++    normalizeTest("http://www.apotheek.nl/Medische_informatie/Veelgestelde_vragen/Vragen/Waarom_nemen_mensen_een_soort_morfine__namelijk_heroïne__als_drug_.aspx?mId=10700&rId=257", "http://www.apotheek.nl/Medische_informatie/Veelgestelde_vragen/Vragen/Waarom_nemen_mensen_een_soort_morfine__namelijk_hero%C3%AFne__als_drug_.aspx?mId=10700&rId=257");
++    normalizeTest("http://www.apotheek.nl/Medische_informatie/Veelgestelde_vragen/Vragen/Waarom_nemen_mensen_een_soort_morfine__namelijk_hero%C3%AFne__als_drug_.aspx?mId=10700&rId=257", "http://www.apotheek.nl/Medische_informatie/Veelgestelde_vragen/Vragen/Waarom_nemen_mensen_een_soort_morfine__namelijk_hero%C3%AFne__als_drug_.aspx?mId=10700&rId=257");
+   }
+ 
+   private void normalizeTest(String weird, String normal) throws Exception {
++    System.out.println("in="+weird+" out="+normalizer.normalize(weird, URLNormalizers.SCOPE_DEFAULT));
+     assertEquals(normal, normalizer.normalize(weird, URLNormalizers.SCOPE_DEFAULT));
+   }
+ 
+Index: src/plugin/urlnormalizer-basic/src/java/org/apache/nutch/net/urlnormalizer/basic/BasicURLNormalizer.java
+===================================================================
+--- src/plugin/urlnormalizer-basic/src/java/org/apache/nutch/net/urlnormalizer/basic/BasicURLNormalizer.java	(revision 1600845)
++++ src/plugin/urlnormalizer-basic/src/java/org/apache/nutch/net/urlnormalizer/basic/BasicURLNormalizer.java	(working copy)
+@@ -19,6 +19,7 @@
+ 
+ import java.net.URL;
+ import java.net.MalformedURLException;
++import java.nio.charset.Charset;
+ 
+ // Slf4j Logging imports
+ import org.slf4j.Logger;
+@@ -41,17 +42,24 @@
+           return new Perl5Matcher();
+         }
+       };
++
++    private final static java.util.regex.Pattern hasNormalizablePattern = java.util.regex.Pattern.compile("/\\.?\\.?/");
++
+     private final Rule relativePathRule;
+     private final Rule leadingRelativePathRule;
+     private final Rule currentPathRule;
+     private final Rule adjacentSlashRule;
+-    
+-    private final static java.util.regex.Pattern hasNormalizablePattern = java.util.regex.Pattern.compile("/\\.?\\.?/");
++    private final Rule unescapeRule;
+ 
+     private Configuration conf;
++    
++    private Charset utf8;
+ 
+     public BasicURLNormalizer() {
+       try {
++        // charset used for encoding URLs before escaping
++        utf8 = Charset.forName("UTF-8");
++
+         // this pattern tries to find spots like "/xx/../" in the url, which
+         // could be replaced by "/" xx consists of chars, different then "/"
+         // (slash) and needs to have at least one char different from "."
+@@ -82,6 +90,11 @@
+           compiler.compile("/{2,}", Perl5Compiler.READ_ONLY_MASK);     
+         adjacentSlashRule.substitution = new Perl5Substitution("/");
+         
++        // this pattern tries to find spots like "%34" in the url,
++        unescapeRule = new Rule();
++        unescapeRule.pattern = (Perl5Pattern)
++          compiler.compile("%([0-9A-Fa-f]{2})", Perl5Compiler.READ_ONLY_MASK);
++        
+       } catch (MalformedPatternException e) {
+         throw new RuntimeException(e);
+       }
+@@ -93,7 +106,13 @@
+             return urlString;
+ 
+         urlString = urlString.trim();                 // remove extra spaces
++        
++        urlString = unescapeURL(urlString);           // decode %nn characters
+ 
++        urlString = urlString.replace(" ","%20");     // replace spaces in URL
++
++        urlString = escapeURL(urlString);             // encode non ascii characters
++
+         URL url = new URL(urlString);
+ 
+         String protocol = url.getProtocol();
+@@ -145,7 +164,67 @@
+ 
+         return urlString;
+     }
++    
++    /**
++     * Remove % encoding from URL in range 0x20-0x80 exclusive
++     * / and # are not decoded
++     */
++    private String unescapeURL(String file) {
++      StringBuilder sb = new StringBuilder();
++      PatternMatcherInput in = new PatternMatcherInput(file);
++      Perl5Matcher matcher = (Perl5Matcher)matchers.get();
++      int end = -1;
++      int letter;
+ 
++      while(matcher.contains(in, unescapeRule.pattern)) {
++        MatchResult res;
++
++        res = matcher.getMatch();
++        sb.append(file.substring(end + 1, res.beginOffset(0)));
++        letter = Integer.valueOf(res.group(1),16);
++        if (letter <= 32 || letter > 127 || letter == 0x23 || letter == 0x2f ) {
++          sb.append(res.group(0).toUpperCase());
++        } else {
++          sb.append(new Character((char)letter));
++        }
++        
++        end = res.beginOffset(0)+2;
++      }
++       
++      letter = file.length();
++      if ( end <= letter - 1 )
++        sb.append(file.substring(end + 1, letter));
++
++      return sb.toString();
++    }
++
++    /**
++     * Convert URL from unicode to UTF-8 and escape high bit and control chars
++     * 
++     * control characters at URL sides will not currently reach this
++     * function because String.trim() is called on URL before sending it here.
++     */
++    private String escapeURL(String URL) {
++      StringBuilder sb=new StringBuilder(URL.length());
++
++      for (byte b: URL.getBytes(utf8)) {
++        String hex;
++        
++        if ( b < 32 ) {
++          sb.append('%');
++          hex = Integer.toHexString(b & 0xFF).toUpperCase();
++          if ( hex.length() % 2 != 0 ) {
++            sb.append('0');
++          }
++          
++          sb.append(hex);
++        } else {
++          sb.append((char)b);
++        }
++      }
++      return sb.toString();
++    }
++
+     private String substituteUnnecessaryRelativePaths(String file) {
+     	
+     	if (!hasNormalizablePattern.matcher(file).find())
