@@ -78,6 +78,11 @@
    <name>fetcher.queue.mode</name>
    <value>byHost</value>
   </property>
+  <!-- Have a larger queue -->
+  <property>
+    <name>fetcher.queue.depth.multiplier</name>
+    <value>100</value>
+  </property>
   <!-- No more than 1 thread per host -->
   <property>
     <name>fetcher.threads.per.queue</name>
