@@ -81,7 +81,7 @@
   <!-- Have a larger queue -->
   <property>
     <name>fetcher.queue.depth.multiplier</name>
-    <value>100</value>
+    <value>150</value>
   </property>
   <!-- No more than 1 thread per host -->
   <property>
@@ -111,7 +111,7 @@
   <!-- Start checking throughput just before time limit -->
   <property>
     <name>fetcher.throughput.threshold.check.after</name>
-    <value>15</value>
+    <value>25</value>
   </property>
   <!-- Minimum throughput of pages per second -->
   <property>
