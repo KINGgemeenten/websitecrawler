@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Fetch Nutch 1.8 sources
-wget http://apache.mirror.triple-it.nl/nutch/1.8/apache-nutch-1.8-src.tar.gz
+wget http://archive.apache.org/dist/nutch/1.8/apache-nutch-1.8-bin.tar.gz
 
 # Unpack and get rid of archive
 tar -xvzf apache-nutch-1.8-src.tar.gz
