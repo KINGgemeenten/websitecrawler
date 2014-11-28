@@ -101,7 +101,7 @@
   <!-- We don't need more than 20 threads -->
   <property>
     <name>fetcher.threads.fetch</name>
-    <value>8</value>
+    <value>10</value>
   </property>
   <!-- Kill a stalling fether after 10 minutes -->
   <property>
