@@ -3,7 +3,7 @@
 # case-insensitive, allow unknown suffixes
 +I
 # uncomment the line below to filter on url path
-#+P
++P
 
 ### prohibit these
 # documents

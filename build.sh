@@ -2,6 +2,7 @@
 
 # Fetch Nutch 1.8 sources
 wget http://archive.apache.org/dist/nutch/1.8/apache-nutch-1.8-src.tar.gz
+#wget http://apache.cs.uu.nl/dist/nutch/1.9/apache-nutch-1.9-src.tar.gz
 
 # Unpack and get rid of archive
 tar -xvzf apache-nutch-1.8-src.tar.gz
