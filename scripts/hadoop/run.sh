@@ -5,14 +5,14 @@
   then
     # Check for updated inject URL's and domain URL filter
     echo Downloading updated seed.txt
-    if curl -s -f http://triquanta_test:triquanta_test@toegankelijk-acc.triquanta.nl/seed.txt > seed.txt.new
+    if curl -s -f http://test:test@test-acc.triquanta.nl/seed.txt > seed.txt.new
     then
       # Check it has changed
       if ! diff -q seeds/seed.txt seed.txt.new
       then
         # Attempt to fetch the other file
         echo Downloading domain-urlfilter.txt
-        if curl -s -f http://triquanta_test:triquanta_test@toegankelijk-acc.triquanta.nl/domain-urlfilter.txt > domain-urlfilter.txt.new
+        if curl -s -f http://test:test@test.nl/domain-urlfilter.txt > domain-urlfilter.txt.new
         then
           # Check domain URL filter has changed
           if ! diff -q conf/domain-urlfilter.txt domain-urlfilter.txt.new
