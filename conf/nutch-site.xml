@@ -7,7 +7,7 @@
   <!-- Enabled plugins -->
   <property>
     <name>plugin.includes</name>
-    <value>protocol-httpclient|parse-tika|index-(basic|more|metadata)|urlnormalizer-(basic|regex)|urlfilter-(prefix|suffix|domain|regex)|badencoding-detector|tag-marker</value>
+    <value>protocol-httpclient|parse-tika|index-(basic|more|metadata)|urlnormalizer-(basic|regex)|urlfilter-(prefix|suffix|domain|regex)|badencoding-detector|tag-marker|indexer-solr</value>
   </property>
 
   <!-- we don't use this for now -->
@@ -70,7 +70,7 @@
   <!-- Generate no more than N records per queue -->
   <property>
     <name>generate.max.count</name>
-    <value>128</value>
+    <value>32</value>
   </property>
 
   <!-- Queue by host -->
@@ -81,7 +81,7 @@
   <!-- Have a larger queue -->
   <property>
     <name>fetcher.queue.depth.multiplier</name>
-    <value>150</value>
+    <value>50</value>
   </property>
   <!-- No more than 1 thread per host -->
   <property>
@@ -96,7 +96,7 @@
   <!-- No more than one request per host every N seconds -->
   <property>
     <name>fetcher.server.delay</name>
-    <value>4.0</value>
+    <value>8.0</value>
   </property>
   <!-- We don't need more than 20 threads -->
   <property>
@@ -192,6 +192,6 @@
   <!-- Where's Solr located? -->
   <property>
     <name>solr.server.url</name>
-    <value>http://vps38902.public.cloudvps.com:8080/solr/nutch</value>
+    <value>http://www.gewoontoegankelijk.nl:8080/solr/nutch</value>
   </property>
 </configuration>
