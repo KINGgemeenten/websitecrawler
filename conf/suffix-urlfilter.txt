@@ -68,6 +68,7 @@
 .mpg
 .mpe
 .mp3
+.mp4
 .mp2
 .aac
 .mov
