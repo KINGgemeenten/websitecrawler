@@ -70,7 +70,7 @@
   <!-- Generate no more than N records per queue -->
   <property>
     <name>generate.max.count</name>
-    <value>32</value>
+    <value>48</value>
   </property>
 
   <!-- Queue by host -->
@@ -91,12 +91,12 @@
   <!-- Kill the queue after N exceptions such as transient connection errors -->
   <property>
     <name>fetcher.max.exceptions.per.queue</name>
-    <value>8</value>
+    <value>6</value>
   </property>
   <!-- No more than one request per host every N seconds -->
   <property>
     <name>fetcher.server.delay</name>
-    <value>8.0</value>
+    <value>6.0</value>
   </property>
   <!-- We don't need more than 20 threads -->
   <property>
@@ -192,6 +192,15 @@
   <!-- Where's Solr located? -->
   <property>
     <name>solr.server.url</name>
+<!--
     <value>http://www.gewoontoegankelijk.nl:8080/solr/nutch</value>
+-->
+    <value>http://vps42750.public.cloudvps.com:8080/solr/nutch/</value>
+  </property>
+
+  <!-- Small batches or we'll destroy the indexer -->
+  <property>
+    <name>solr.commit.size</name>
+    <value>64</value>
   </property>
 </configuration>
