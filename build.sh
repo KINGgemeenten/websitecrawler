@@ -31,4 +31,4 @@ mkdir runtime/local/free_urls/
 cp -r ../inject_urls runtime/local
 
 # Upload to the cluster
-scp runtime/deploy/apache-nutch-1.8.job hadoop@vps2868.directvps.nl:/opt/nutch/
+scp runtime/deploy/apache-nutch-1.8.job hadoop@jobtracker.gewoontoegankelijk.nl:/opt/nutch/
