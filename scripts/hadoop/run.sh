@@ -100,7 +100,7 @@
     nutch updatedb -Dplugin.includes="urlfilter-(domain|suffix)" crawl/crawldb -dir segments/update/ -filter
 
     # Send the stuff to the index
-    nutch index -Dmapred.reduce.tasks=12 crawl/crawldb -dir segments/update -deleteGone -noCommit
+    nutch index -Dmapred.reduce.tasks=12 crawl/crawldb -dir segments/update -deleteGone
 
     # Move the finished segments to their daily finished queue
     hadoop fs -mv segments/update/* segments/finished/ &
