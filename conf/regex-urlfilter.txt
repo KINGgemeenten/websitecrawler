@@ -37,6 +37,8 @@
 # AND THIS http://www.woudrichem.nl/inwoners/trouwen-in-woudrichem_41255/kalender/1927/09/9/
 -^http[s]*://[^/]+?/.*(?:agenda|kalender|calendar|event|evenementen/(?:day|month|year)*)+.*(?:\d+[^\d]{1}){2}\d*
 
+# Another Missing: http://www.almere.nl/vrijetijd/evenementen/jaar/2022/maand/1/dag/1
+-jaar/\d+/maand/\d+/dag/\d+
 
 # Don't need this crap
 -download.html$
