@@ -40,6 +40,10 @@
 # Another Missing: http://www.almere.nl/vrijetijd/evenementen/jaar/2022/maand/1/dag/1
 -jaar/\d+/maand/\d+/dag/\d+
 
+# niet ok: http://oldenzaal.nl/sjablonen/1/infotype/event/page/view.asp?objectID=2331&eventID=6883&weergave=2&dag=41597&kaldate=41608
+# https://secure.weesp.nl/index.php?month=12&year=2009&simaction=content&mediumid=10&day=12
+-(?:date|year)=\d+
+
 # Don't need this crap
 -download.html$
 
