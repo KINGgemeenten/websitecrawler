@@ -41,8 +41,18 @@
 -jaar/\d+/maand/\d+/dag/\d+
 
 # niet ok: http://oldenzaal.nl/sjablonen/1/infotype/event/page/view.asp?objectID=2331&eventID=6883&weergave=2&dag=41597&kaldate=41608
+# not caught: http://www.oldenzaal.nl/sjablonen/1/infotype/event/page/view.asp?objectID=2331&weergave=0&dag=46763
 # https://secure.weesp.nl/index.php?month=12&year=2009&simaction=content&mediumid=10&day=12
--(?:date|year)=\d+
+-(?:date|year|dag)=\d+
+
+# http://www.s-hertogenbosch.nl/nc/bezoeker/evenementenkalender/maand/4977/augustus/
+-www\.s-hertogenbosch\.nl/.+kalender/maand/\d+
+
+# http://www.neerijnen.nl/nieuws/evenementen/1720/01
+-www\.neerijnen\.nl/.+evenementen/\d+/\d+
+
+# https://www.gemeentenoordenveld.nl/bestuur_en_organisatie/nieuws/activiteitenkalender_gemeente/2544/08
+-www\.gemeentenoordenveld\.nl/.+kalender.+/\d+/\d+
 
 # Don't need this crap
 -download.html$
