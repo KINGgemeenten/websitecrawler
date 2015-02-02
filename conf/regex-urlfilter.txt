@@ -104,7 +104,9 @@
 +onderbanken.nl
 +rhenen.nl
 +rees.bloemendaal.nl
-
++alphen-chaam.nl
++hengelo.nl
++weststellingwerf.nl
 
 # skip URLs containing certain characters as probable queries, etc.
 -[?*!@=]
