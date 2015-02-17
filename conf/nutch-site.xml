@@ -70,7 +70,7 @@
   <!-- Generate no more than N records per queue -->
   <property>
     <name>generate.max.count</name>
-    <value>48</value>
+    <value>64</value>
   </property>
 
   <!-- Queue by host -->
@@ -96,7 +96,7 @@
   <!-- No more than one request per host every N seconds -->
   <property>
     <name>fetcher.server.delay</name>
-    <value>6.0</value>
+    <value>5.0</value>
   </property>
   <!-- We don't need more than 20 threads -->
   <property>
@@ -106,12 +106,12 @@
   <!-- Kill a stalling fether after 10 minutes -->
   <property>
     <name>fetcher.timelimit.mins</name>
-    <value>30</value>
+    <value>15</value>
   </property>
   <!-- Start checking throughput just before time limit -->
   <property>
     <name>fetcher.throughput.threshold.check.after</name>
-    <value>25</value>
+    <value>8</value>
   </property>
   <!-- Minimum throughput of pages per second -->
   <property>
