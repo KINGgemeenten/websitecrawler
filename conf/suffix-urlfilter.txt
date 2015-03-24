@@ -5,12 +5,16 @@
 # uncomment the line below to filter on url path
 +P
 
+
 ### prohibit these
 # documents
 .pdf
 .doc
 .docx
-.xls
+.ppt
+.pptx
+.xls 
+.xlsx 
 
 # feeds
 .atom
