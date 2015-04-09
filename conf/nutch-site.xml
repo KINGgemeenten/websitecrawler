@@ -73,6 +73,11 @@
     <value>64</value>
   </property>
 
+  <!-- Increase default (30) crawl-delay so we son't skip some pages/domains (robots denied) -->
+  <property>
+    <name>fetcher.max.crawl.delay</name>
+    <value>120</value>
+  </property>
   <!-- Queue by host -->
   <property>
    <name>fetcher.queue.mode</name>
