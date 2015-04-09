@@ -161,6 +161,7 @@
 +hengelo.nl
 +weststellingwerf.nl
 +bics.nl
++amberalertnederland.nl
 
 # skip URLs containing certain characters as probable queries, etc.
 -[?*!@=]
