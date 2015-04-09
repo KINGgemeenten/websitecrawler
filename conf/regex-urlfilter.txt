@@ -160,6 +160,7 @@
 +alphen-chaam.nl
 +hengelo.nl
 +weststellingwerf.nl
++bics.nl
 
 # skip URLs containing certain characters as probable queries, etc.
 -[?*!@=]
