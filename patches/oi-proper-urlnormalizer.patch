@@ -176,7 +176,7 @@ Index: src/plugin/urlnormalizer-basic/src/java/org/apache/nutch/net/urlnormalize
 +      for (byte b: URL.getBytes(utf8)) {
 +        String hex;
 +        
-+        if ( b < 32 ) {
++        if ( b < 32 || b == 33 ) {
 +          sb.append('%');
 +          hex = Integer.toHexString(b & 0xFF).toUpperCase();
 +          if ( hex.length() % 2 != 0 ) {
