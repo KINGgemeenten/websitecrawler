@@ -7,7 +7,7 @@
   <!-- Enabled plugins -->
   <property>
     <name>plugin.includes</name>
-    <value>protocol-httpclient|parse-tika|index-(basic|more|metadata)|urlnormalizer-(basic|regex)|urlfilter-(prefix|suffix|domain|regex)|badencoding-detector|tag-marker|indexer-solr</value>
+    <value>protocol-httpclient|parse-tika|index-(basic|more|metadata)|urlnormalizer-(basic|querystring|regex)|urlfilter-(prefix|suffix|domain|regex)|badencoding-detector|tag-marker|indexer-solr|scoring-depth</value>
   </property>
 
   <!-- we don't use this for now -->
@@ -16,6 +16,11 @@
     <value>false</value>
   </property>
 
+  <!-- We don't want to venture too deep -->
+  <property>
+    <name>scoring.depth.max</name>
+    <value>250</value>
+  </property>
 
   <!-- HTTP library -->
 
@@ -70,7 +75,7 @@
   <!-- Generate no more than N records per queue -->
   <property>
     <name>generate.max.count</name>
-    <value>64</value>
+    <value>100</value>
   </property>
 
   <!-- Increase default (30) crawl-delay so we son't skip some pages/domains (robots denied) -->
