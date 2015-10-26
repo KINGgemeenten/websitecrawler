@@ -8,6 +8,9 @@
 
 # TODO: set mappers and reducers
 
+# Remove old segments
+hadoop fs -rmr segments/retired/`date -d "6 months ago" +%Y%m%d`
+
 if [ $# = 0 ]
 then
   # Yesterday's date as represented in segment names e.g. 20131219
