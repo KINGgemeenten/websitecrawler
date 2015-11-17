@@ -138,10 +138,9 @@
     <name>fetcher.parse</name>
     <value>true</value>
   </property>
-  <!-- We need the raw content stored -->
   <property>
     <name>fetcher.store.content</name>
-    <value>true</value>
+    <value>false</value>
   </property>
   <!-- Evident -->
   <property>
